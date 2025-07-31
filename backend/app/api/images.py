@@ -5,8 +5,8 @@ import os
 
 from app.core.database import get_db
 from app.core.config import settings
-from app.services.image_service import ImageService
-from app.services.minio_service import MinioService
+from app.services.persistence.image_service import ImageService
+from app.services.storage.storage_service import get_storage_service
 from app.schemas import ImageWithTags
 from app.models import Image
 
@@ -109,22 +109,22 @@ def update_image_tags(
         raise HTTPException(status_code=500, detail="Failed to update tags")
 
 @router.delete("/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_image(image_id: int, db: Session = Depends(get_db)):
+async def delete_image(image_id: int, db: Session = Depends(get_db)):
     """删除图片"""
     image_service = ImageService(db)
-    if not image_service.delete_image(image_id):
+    if not await image_service.delete_image(image_id):
         raise HTTPException(status_code=404, detail="Image not found")
 
 @router.get("/{image_id}/url")
-def get_image_url(image_id: int, thumbnail: bool = False, db: Session = Depends(get_db)):
+async def get_image_url(image_id: int, thumbnail: bool = False, db: Session = Depends(get_db)):
     """获取图片URL"""
     image = db.query(Image).filter(Image.id == image_id).first()
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
     
-    minio_service = MinioService()
+    storage_service = get_storage_service()
     file_path = image.thumbnail_path if thumbnail and image.thumbnail_path else image.file_path
-    url = minio_service.get_file_url(file_path)
+    url = await storage_service.get_file_url(file_path)
     
     if not url:
         raise HTTPException(status_code=500, detail="Failed to generate file URL")

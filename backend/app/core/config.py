@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     MINIO_BUCKET_NAME: str = "images"
     MINIO_SECURE: bool = False
     
+    # 存储配置
+    STORAGE_TYPE: str = "local"  # "local" 或 "minio"
+    LOCAL_STORAGE_PATH: str = "uploads"
+    
     # JWT配置
     SECRET_KEY: str = "fqee24fdsasfwec"
     ALGORITHM: str = "HS256"

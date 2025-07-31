@@ -1,12 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-from app.core.config import settings
 from app.core.database import init_db
 from app.api import api_router
-from app.services.minio_service import MinioService
+from app.services.storage.storage_service import get_storage_service
 
 app = FastAPI(
     title="Image Manager API",
@@ -26,15 +26,16 @@ app.add_middleware(
 # 包含API路由
 app.include_router(api_router, prefix="/api/v1")
 
-@app.on_event("startup")
+
+@asynccontextmanager
 async def startup_event():
     """应用启动时的初始化"""
     # 初始化数据库
     await init_db()
     
-    # 初始化MinIO
-    minio_service = MinioService()
-    await minio_service.ensure_bucket_exists()
+    # 初始化存储服务
+    storage_service = get_storage_service()
+    await storage_service.ensure_storage_ready()
 
 @app.get("/")
 async def root():

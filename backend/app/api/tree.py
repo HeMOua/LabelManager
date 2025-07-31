@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.services.tree_service import TreeService
+from app.services.persistence.tree_service import TreeService
 from app.schemas import TreeNode
 from app.models import Project
 

@@ -2,19 +2,18 @@ from PIL import Image as PILImage
 import io
 import uuid
 import os
-from typing import Tuple, Optional, List, Dict, Any
+from typing import Tuple, Optional, List
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
 
 from app.models import Image, Tag, ImageTag
-from app.schemas import ImageCreate, ImageWithTags
-from app.services.minio_service import MinioService
+from app.schemas import ImageWithTags
+from app.services.storage.storage_service import get_storage_service
 from app.core.config import settings
 
 class ImageService:
     def __init__(self, db: Session):
         self.db = db
-        self.minio_service = MinioService()
+        self.storage_service = get_storage_service()
     
     def create_thumbnail(self, image_data: bytes) -> bytes:
         """创建缩略图"""
@@ -61,16 +60,16 @@ class ImageService:
         # 创建缩略图
         thumbnail_data = self.create_thumbnail(file_data)
         
-        # 上传原图和缩略图到MinIO
+        # 上传原图和缩略图到存储
         file_path = f"images/{unique_filename}"
         thumbnail_path = f"thumbnails/{thumbnail_filename}"
         
-        if not self.minio_service.upload_file(file_data, file_path, content_type):
+        if not await self.storage_service.upload_file(file_data, file_path, content_type):
             raise RuntimeError("Failed to upload image")
         
-        if not self.minio_service.upload_file(thumbnail_data, thumbnail_path, "image/jpeg"):
+        if not await self.storage_service.upload_file(thumbnail_data, thumbnail_path, "image/jpeg"):
             # 如果缩略图上传失败，删除已上传的原图
-            self.minio_service.delete_file(file_path)
+            await self.storage_service.delete_file(file_path)
             raise RuntimeError("Failed to upload thumbnail")
         
         # 保存到数据库
@@ -131,17 +130,17 @@ class ImageService:
             self.db.rollback()
             return False
     
-    def delete_image(self, image_id: int) -> bool:
+    async def delete_image(self, image_id: int) -> bool:
         """删除图片"""
         image = self.db.query(Image).filter(Image.id == image_id).first()
         if not image:
             return False
         
         try:
-            # 删除MinIO中的文件
-            self.minio_service.delete_file(image.file_path)
+            # 删除存储中的文件
+            await self.storage_service.delete_file(image.file_path)
             if image.thumbnail_path:
-                self.minio_service.delete_file(image.thumbnail_path)
+                await self.storage_service.delete_file(image.thumbnail_path)
             
             # 删除数据库记录
             self.db.delete(image)
