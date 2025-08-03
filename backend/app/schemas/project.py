@@ -2,8 +2,12 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List
 
-class ProjectBase(BaseModel):
+from app.core.response import CamelCaseModel
+
+
+class ProjectBase(CamelCaseModel):
     name: str
+    status: str
     description: Optional[str] = None
 
 class ProjectCreate(ProjectBase):

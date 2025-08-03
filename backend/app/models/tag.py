@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -13,4 +13,4 @@ class Tag(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # 关系
-    image_tags = relationship("ImageTag", back_populates="tag", cascade="all, delete-orphan")
+    image_tags = relationship("ImageTag", back_populates="tag")

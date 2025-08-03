@@ -7,3 +7,14 @@ export interface Project {
   createdAt?: string
   updatedAt?: string
 }
+
+export interface ProjectCreate {
+  name: string
+  description?: string
+}
+
+export interface ProjectUpdate {
+  name?: string
+  description?: string
+  status?: 'active' | 'completed' | 'paused'
+}

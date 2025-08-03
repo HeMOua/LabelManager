@@ -5,3 +5,13 @@ export interface Tag {
   createdAt?: string
   updatedAt?: string
 }
+
+export interface TagCreate {
+  name: string
+  color?: string
+}
+
+export interface TagUpdate {
+  name?: string
+  color?: string
+}

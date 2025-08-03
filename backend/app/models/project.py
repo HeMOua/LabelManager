@@ -10,7 +10,6 @@ class Project(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, index=True)
     status = Column(String(50), nullable=False, default="active", index=True)  # 状态字段
-    image_count = Column(Integer, default=0)  # 图像数量
     description = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -27,8 +27,7 @@ import SidebarItem from './SidebarItem.vue'
 import { useAppStore } from '@/stores/app'
 
 defineComponent({
-  // eslint-disable-next-line vue/multi-word-component-names
-  name: 'Sidebar'
+  name: 'SidebarComponent'
 })
 
 const appStore = useAppStore()

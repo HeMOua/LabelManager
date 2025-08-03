@@ -21,4 +21,4 @@ class Image(Base):
     
     # 关系
     project = relationship("Project", back_populates="images")
-    image_tags = relationship("ImageTag", back_populates="image", cascade="all, delete-orphan")
+    image_tags = relationship("ImageTag", back_populates="image")

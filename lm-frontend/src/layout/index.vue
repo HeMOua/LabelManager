@@ -15,8 +15,13 @@ import Header from '@/layout/components/Header.vue'
 import TabsBar from '@/layout/components/TabsBar.vue'
 import MainContent from '@/layout/components/MainContent.vue'
 import { useAppStore } from '@/stores/app'
+import { defineComponent } from 'vue'
 
 const appStore = useAppStore()
+
+defineComponent({
+  name: 'LayoutIndex'
+})
 </script>
 
 <style scoped>
