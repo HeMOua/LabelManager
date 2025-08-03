@@ -41,7 +41,7 @@ def get_projects(skip: int = 0, limit: int = 100, db: Session = Depends(get_db))
 @router.post("/", response_model=ProjectSchema)
 def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
     """创建项目"""
-    db_project = Project(**project.dict())
+    db_project = Project(**project.model_dump())
     db.add(db_project)
     db.commit()
     db.refresh(db_project)
@@ -62,7 +62,7 @@ def update_project(project_id: int, project: ProjectUpdate, db: Session = Depend
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    update_data = project.dict(exclude_unset=True)
+    update_data = project.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_project, field, value)
     
