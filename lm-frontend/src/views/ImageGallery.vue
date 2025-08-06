@@ -12,8 +12,9 @@
               accept="image/*"
               multiple
               action="#"
+              :disabled="batchMode"
             >
-              <el-button type="primary" :icon="Upload">
+              <el-button type="primary" :icon="Upload" :disabled="batchMode">
                 选择图片
               </el-button>
             </el-upload>
@@ -22,7 +23,7 @@
               type="success" 
               :icon="UploadFilled"
               :loading="uploading"
-              :disabled="!selectedFiles.length || !selectedProject"
+              :disabled="!selectedFiles.length || !selectedProject || batchMode"
             >
               上传图片 ({{ selectedFiles.length }})
             </el-button>
@@ -32,6 +33,7 @@
               style="width: 200px"
               clearable
               @change="onProjectChange"
+              :disabled="batchMode"
             >
               <el-option
                 v-for="project in projects"
@@ -40,9 +42,62 @@
                 :value="project.id"
               />
             </el-select>
+            
+            <!-- 视图模式切换 -->
+            <el-button-group class="view-toggle">
+              <el-button 
+                :type="viewMode === 'grid' ? 'primary' : ''"
+                :icon="Grid"
+                @click="switchViewMode('grid')"
+                title="网格视图"
+              />
+              <el-button 
+                :type="viewMode === 'list' ? 'primary' : ''"
+                :icon="List"
+                @click="switchViewMode('list')"
+                title="列表视图"
+              />
+            </el-button-group>
+            
+            <!-- 批量选择开关 -->
+            <el-switch
+              v-model="batchMode"
+              inactive-text="批量选择"
+              :disabled="!filteredImages.length"
+              @change="onBatchModeChange"
+            />
           </div>
         </template>
       </el-page-header>
+      
+      <!-- 批量操作面板 -->
+      <div v-if="batchMode" class="batch-panel">
+        <div class="batch-info">
+          <el-checkbox 
+            v-model="selectAll"
+            :indeterminate="isIndeterminate"
+            @change="handleSelectAll"
+          >
+            全选 ({{ selectedImages.length }}/{{ filteredImages.length }})
+          </el-checkbox>
+        </div>
+        <div class="batch-actions" v-if="selectedImages.length > 0">
+          <el-button 
+            type="primary"
+            :icon="Plus"
+            @click="showBatchTagDialog = true"
+          >
+            批量添加标签
+          </el-button>
+          <el-button 
+            type="danger"
+            :icon="Delete"
+            @click="batchDeleteImages"
+          >
+            批量删除 ({{ selectedImages.length }})
+          </el-button>
+        </div>
+      </div>
     </div>
 
     <!-- 加载状态 -->
@@ -50,15 +105,26 @@
       <el-skeleton :rows="3" animated />
     </div>
 
-    <!-- 图片网格 -->
-    <div class="gallery-grid" v-else-if="filteredImages.length > 0">
+    <!-- 网格视图 -->
+    <div class="gallery-grid" v-else-if="filteredImages.length > 0 && viewMode === 'grid'">
       <el-card 
         v-for="image in filteredImages" 
         :key="image.id" 
         class="image-card"
-        :class="{ selected: selectedImage?.id === image.id }"
+        :class="{ 
+          selected: selectedImage?.id === image.id,
+          'batch-selected': selectedImages.includes(image.id) 
+        }"
         shadow="hover"
       >
+        <!-- 批量选择复选框 -->
+        <div v-if="batchMode" class="batch-checkbox">
+          <el-checkbox 
+            :model-value="selectedImages.includes(image.id)"
+            @change="toggleImageSelection(image.id)"
+          />
+        </div>
+        
         <div class="image-container">
           <el-image
             :src="getImageThumbnail(image)"
@@ -67,7 +133,7 @@
             class="image-preview"
             lazy
             loading="lazy"
-            @click="previewImage(image)"
+            @click="handleImageClick(image)"
             @error="handleImageError(image)"
           >
             <template #placeholder>
@@ -86,7 +152,7 @@
           </el-image>
           
           <!-- 图片操作按钮 -->
-          <div class="image-actions">
+          <div v-if="!batchMode" class="image-actions">
             <el-button-group>
               <el-button 
                 size="small" 
@@ -111,7 +177,7 @@
           </div>
         </div>
         
-        <div class="image-info" @click="editImageTags(image)">
+        <div class="image-info" @click="handleImageInfoClick(image)">
           <h3 :title="image.filename || '图片'">
             {{ truncateText(image.filename || '图片', 20) }}
           </h3>
@@ -139,6 +205,110 @@
           </div>
         </div>
       </el-card>
+    </div>
+
+    <!-- 列表视图 -->
+    <div v-else-if="filteredImages.length > 0 && viewMode === 'list'" class="gallery-list">
+      <el-table 
+        :data="filteredImages" 
+        stripe
+        @row-click="handleRowClick"
+        :row-class-name="getRowClassName"
+      >
+        <el-table-column v-if="batchMode" width="55">
+          <template #header>
+            <el-checkbox 
+              v-model="selectAll"
+              :indeterminate="isIndeterminate"
+              @change="handleSelectAll"
+            />
+          </template>
+          <template #default="{ row }">
+            <el-checkbox 
+              :model-value="selectedImages.includes(row.id)"
+              @change="toggleImageSelection(row.id)"
+              @click.stop
+            />
+          </template>
+        </el-table-column>
+        
+        <el-table-column label="预览" width="80">
+          <template #default="{ row }">
+            <el-image
+              :src="getImageThumbnail(row)"
+              :alt="row.filename || '图片'"
+              fit="cover"
+              class="table-image-preview"
+              @click.stop="openImagePreview(row)"
+              @error="handleImageError(row)"
+            >
+              <template #error>
+                <div class="table-image-error">
+                  <el-icon><Picture /></el-icon>
+                </div>
+              </template>
+            </el-image>
+          </template>
+        </el-table-column>
+        
+        <el-table-column label="文件名" prop="filename" min-width="200">
+          <template #default="{ row }">
+            <span :title="row.filename">{{ row.filename || '图片' }}</span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column label="上传时间" width="160">
+          <template #default="{ row }">
+            {{ formatDate(row.createdAt) }}
+          </template>
+        </el-table-column>
+        
+        <el-table-column label="标签" min-width="200">
+          <template #default="{ row }">
+            <div class="table-tags">
+              <el-tag 
+                v-for="tag in (row.tags || []).slice(0, 3)" 
+                :key="tag.id" 
+                :color="tag.color"
+                size="small"
+                style="margin-right: 4px; margin-bottom: 2px;"
+              >
+                {{ tag.name }}
+              </el-tag>
+              <el-tag 
+                v-if="row.tags && row.tags.length > 3"
+                size="small"
+                type="info"
+              >
+                +{{ row.tags.length - 3 }}
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
+        
+        <el-table-column v-if="!batchMode" label="操作" width="160" fixed="right">
+          <template #default="{ row }">
+            <el-button-group size="small">
+              <el-button 
+                :icon="View" 
+                @click.stop="openImagePreview(row)"
+                title="预览"
+              />
+              <el-button 
+                :icon="Edit" 
+                @click.stop="editImageTags(row)"
+                title="编辑标签"
+              />
+              <el-button 
+                :icon="Delete" 
+                type="danger"
+                @click.stop="deleteImage(row)"
+                title="删除"
+              />
+            </el-button-group>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
 
     <!-- 空状态 -->
@@ -293,12 +463,65 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 批量添加标签对话框 -->
+    <el-dialog
+      v-model="showBatchTagDialog"
+      title="批量添加标签"
+      width="500px"
+    >
+      <div class="batch-tag-content">
+        <p>为 {{ selectedImages.length }} 张图片添加标签：</p>
+        <el-select 
+          v-model="batchTagIds" 
+          placeholder="选择要添加的标签"
+          style="width: 100%;"
+          multiple
+          filterable
+        >
+          <el-option-group
+            v-for="category in tagsByCategory"
+            :key="category.name"
+            :label="category.name"
+          >
+            <el-option
+              v-for="tag in category.tags"
+              :key="tag.id"
+              :label="tag.name"
+              :value="tag.id"
+            >
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div 
+                  style="width: 12px; height: 12px; border-radius: 50%;"
+                  :style="{ backgroundColor: tag.color }"
+                ></div>
+                <span>{{ tag.name }}</span>
+              </div>
+            </el-option>
+          </el-option-group>
+        </el-select>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showBatchTagDialog = false">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="saveBatchTags"
+            :loading="savingBatchTags"
+            :disabled="!batchTagIds.length"
+          >
+            批量添加
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { Upload, UploadFilled, Plus, View, Edit, Delete, Picture, Loading } from '@element-plus/icons-vue'
+import { Upload, UploadFilled, Plus, View, Edit, Delete, Picture, Loading, Grid, List } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Image, Tag, Project } from '@/types/index'
 import { projectApi } from '@/api/project'
@@ -320,7 +543,17 @@ const projects = ref<Project[]>([])
 const availableTags = ref<Tag[]>([])
 const selectedFiles = ref<File[]>([])
 
-// 图片URL缓存 - 使用响应式对象而不是Map，确保Vue能检测到变化
+// 批量选择相关
+const batchMode = ref(false)
+const selectedImages = ref<number[]>([])
+const batchTagIds = ref<number[]>([])
+const showBatchTagDialog = ref(false)
+const savingBatchTags = ref(false)
+
+// 视图模式
+const viewMode = ref<'grid' | 'list'>('grid')
+
+// 图片URL缓存
 const imageUrls = ref<Record<string, { 
   thumbnailUrl?: string; 
   fullUrl?: string; 
@@ -373,6 +606,24 @@ const tagsByCategory = computed(() => {
   }))
 })
 
+// 批量选择相关计算属性
+const selectAll = computed({
+  get: () => {
+    return selectedImages.value.length === filteredImages.value.length && filteredImages.value.length > 0
+  },
+  set: (val: boolean) => {
+    if (val) {
+      selectedImages.value = filteredImages.value.map(img => img.id)
+    } else {
+      selectedImages.value = []
+    }
+  }
+})
+
+const isIndeterminate = computed(() => {
+  return selectedImages.value.length > 0 && selectedImages.value.length < filteredImages.value.length
+})
+
 // 工具函数
 const truncateText = (text: string | undefined, maxLength: number) => {
   if (!text) return ''
@@ -387,6 +638,187 @@ const formatDate = (dateString: string) => {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+// 视图模式持久化
+const saveViewMode = (mode: 'grid' | 'list') => {
+  localStorage.setItem('image-gallery-view-mode', mode)
+}
+
+const loadViewMode = () => {
+  const saved = localStorage.getItem('image-gallery-view-mode') as 'grid' | 'list'
+  if (saved && ['grid', 'list'].includes(saved)) {
+    viewMode.value = saved
+  }
+}
+
+// 视图模式切换
+const switchViewMode = (mode: 'grid' | 'list') => {
+  viewMode.value = mode
+  saveViewMode(mode)
+  
+  // 退出批量模式
+  if (batchMode.value) {
+    batchMode.value = false
+    selectedImages.value = []
+  }
+}
+
+// 批量选择相关方法
+const onBatchModeChange = (enabled: boolean) => {
+  if (!enabled) {
+    selectedImages.value = []
+  }
+}
+
+const handleSelectAll = (checked: boolean) => {
+  if (checked) {
+    selectedImages.value = filteredImages.value.map(img => img.id)
+  } else {
+    selectedImages.value = []
+  }
+}
+
+const toggleImageSelection = (imageId: number) => {
+  const index = selectedImages.value.indexOf(imageId)
+  if (index > -1) {
+    selectedImages.value.splice(index, 1)
+  } else {
+    selectedImages.value.push(imageId)
+  }
+}
+
+// 批量操作方法
+const batchDeleteImages = async () => {
+  if (selectedImages.value.length === 0) return
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedImages.value.length} 张图片吗？`,
+      '批量删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    
+    let successCount = 0
+    const totalCount = selectedImages.value.length
+    
+    // 显示进度
+    ElMessage.info(`正在删除 ${totalCount} 张图片...`)
+    
+    for (const imageId of selectedImages.value) {
+      try {
+        const response = await imageApi.deleteImage(imageId) as unknown as { code: number }
+        if (response?.code === 200) {
+          successCount++
+          // 从缓存中移除
+          const image = images.value.find(img => img.id === imageId)
+          if (image) {
+            const cacheKey = getImageCacheKey(image)
+            delete imageUrls.value[cacheKey]
+          }
+        }
+      } catch (error) {
+        console.error(`Delete image ${imageId} error:`, error)
+      }
+    }
+    
+    if (successCount > 0) {
+      ElMessage.success(`成功删除 ${successCount}/${totalCount} 张图片`)
+      selectedImages.value = []
+      await loadImages()
+    } else {
+      ElMessage.error('删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('批量删除操作失败')
+      console.error('Batch delete error:', error)
+    }
+  }
+}
+
+const saveBatchTags = async () => {
+  if (selectedImages.value.length === 0 || batchTagIds.value.length === 0) return
+  
+  savingBatchTags.value = true
+  let successCount = 0
+  const totalCount = selectedImages.value.length
+  
+  try {
+    ElMessage.info(`正在为 ${totalCount} 张图片添加标签...`)
+    
+    for (const imageId of selectedImages.value) {
+      try {
+        // 获取当前图片的标签
+        const currentImage = images.value.find(img => img.id === imageId)
+        const currentTagIds = currentImage?.tags?.map(tag => tag.id) || []
+        
+        // 合并现有标签和新标签，去重
+        const allTagIds = [...new Set([...currentTagIds, ...batchTagIds.value])]
+        
+        const response = await imageApi.updateImageTags(imageId, allTagIds) as unknown as { code: number }
+        if (response?.code === 200) {
+          successCount++
+          
+          // 更新本地数据
+          const imageIndex = images.value.findIndex(img => img.id === imageId)
+          if (imageIndex !== -1) {
+            const newTags = availableTags.value.filter(tag => allTagIds.includes(tag.id))
+            images.value[imageIndex].tags = newTags
+          }
+        }
+      } catch (error) {
+        console.error(`Update tags for image ${imageId} error:`, error)
+      }
+    }
+    
+    if (successCount > 0) {
+      ElMessage.success(`成功为 ${successCount}/${totalCount} 张图片添加标签`)
+      showBatchTagDialog.value = false
+      batchTagIds.value = []
+    } else {
+      ElMessage.error('标签添加失败')
+    }
+  } catch (error) {
+    ElMessage.error('批量添加标签操作失败')
+    console.error('Batch add tags error:', error)
+  } finally {
+    savingBatchTags.value = false
+  }
+}
+
+// 表格行点击处理
+const handleRowClick = (row: Image) => {
+  if (batchMode.value) {
+    toggleImageSelection(row.id)
+  } else {
+    previewImage(row)
+  }
+}
+
+const getRowClassName = ({ row }: { row: Image }) => {
+  return selectedImages.value.includes(row.id) ? 'selected-row' : ''
+}
+
+// 图片点击处理
+const handleImageClick = (image: Image) => {
+  if (batchMode.value) {
+    toggleImageSelection(image.id)
+  } else {
+    previewImage(image)
+  }
+}
+
+const handleImageInfoClick = (image: Image) => {
+  if (batchMode.value) {
+    toggleImageSelection(image.id)
+  } else {
+    editImageTags(image)
+  }
 }
 
 // 获取图片缓存键
@@ -408,25 +840,20 @@ const getImageThumbnail = (image: Image): string => {
   const cacheKey = initImageCache(image)
   const cache = imageUrls.value[cacheKey]
   
-  // 如果缓存中有缩略图URL，直接返回
   if (cache.thumbnailUrl && !cache.thumbnailError) {
     return cache.thumbnailUrl
   }
   
-  // 如果有直接的URL，使用它
   if (image.url) {
     cache.thumbnailUrl = image.url
     return image.url
   }
   
-  // 如果正在加载，返回占位符
   if (cache.thumbnailLoading) {
     return ''
   }
   
-  // 开始异步加载
   loadImageThumbnail(image, cacheKey)
-  
   return ''
 }
 
@@ -435,25 +862,20 @@ const getImageFullUrl = (image: Image): string => {
   const cacheKey = initImageCache(image)
   const cache = imageUrls.value[cacheKey]
   
-  // 如果缓存中有完整URL，直接返回
   if (cache.fullUrl && !cache.fullError) {
     return cache.fullUrl
   }
   
-  // 如果有直接的URL，使用它
   if (image.url) {
     cache.fullUrl = image.url
     return image.url
   }
   
-  // 如果正在加载，返回缩略图或占位符
   if (cache.fullLoading) {
     return cache.thumbnailUrl || ''
   }
   
-  // 开始异步加载
   loadImageFullUrl(image, cacheKey)
-  
   return cache.thumbnailUrl || ''
 }
 
@@ -540,7 +962,6 @@ const retryLoadImage = (image: Image) => {
     cache.thumbnailError = false
     cache.thumbnailUrl = undefined
     cache.thumbnailLoading = false
-    // 重新触发加载
     nextTick(() => {
       getImageThumbnail(image)
     })
@@ -554,7 +975,6 @@ const loadProjects = async () => {
     if (response?.data) {
       projects.value = response.data
       
-      // 设置选中的项目
       if (route.query.project) {
         selectedProject.value = parseInt(route.query.project as string)
       } else if (projects.value.length > 0) {
@@ -596,19 +1016,21 @@ const loadImages = async () => {
         tags: img.tags || []
       }))
       
-      // 预加载图片URL
       await nextTick()
       images.value.forEach(image => {
-        // 初始化缓存并开始加载
         getImageThumbnail(image)
       })
       
-      // 如果API返回总数，更新total
       if (response.total !== undefined) {
         total.value = response.total
       } else if (Array.isArray(response.data)) {
         total.value = response.data.length
       }
+      
+      // 清理已删除图片的选择状态
+      selectedImages.value = selectedImages.value.filter(id => 
+        images.value.some(img => img.id === id)
+      )
     }
   } catch (error) {
     ElMessage.error('加载图片列表失败')
@@ -621,8 +1043,8 @@ const loadImages = async () => {
 // 事件处理函数
 const onProjectChange = () => {
   currentPage.value = 1
-  // 清空URL缓存
   imageUrls.value = {}
+  selectedImages.value = []
   loadImages()
 }
 
@@ -648,7 +1070,7 @@ const uploadImages = async () => {
     for (const file of selectedFiles.value) {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('tag_ids', '[]') // 暂时不添加标签
+      formData.append('tag_ids', '[]')
       
       try {
         await imageApi.uploadImage(selectedProject.value, formData)
@@ -660,11 +1082,9 @@ const uploadImages = async () => {
     
     ElMessage.success(`成功上传 ${successCount}/${selectedFiles.value.length} 张图片`)
     
-    // 清空选择的文件
     selectedFiles.value = []
     uploadRef.value?.clearFiles()
     
-    // 重新加载图片列表
     await loadImages()
     
   } catch (error) {
@@ -675,18 +1095,14 @@ const uploadImages = async () => {
   }
 }
 
-// 打开图片预览 - 独立的预览功能
 const openImagePreview = (image: Image) => {
   previewImageData.value = image
   showImagePreview.value = true
-  // 预加载完整图片
   getImageFullUrl(image)
 }
 
-// 关闭图片预览
 const closeImagePreview = () => {
   showImagePreview.value = false
-  // 延迟清空预览图片，避免闪烁
   setTimeout(() => {
     if (!showImagePreview.value) {
       previewImageData.value = null
@@ -694,7 +1110,6 @@ const closeImagePreview = () => {
   }, 300)
 }
 
-// 预览图片 - 点击图片本身时的处理
 const previewImage = (image: Image) => {
   openImagePreview(image)
 }
@@ -707,7 +1122,6 @@ const editImageTags = (image: Image) => {
 
 const closeTagDialog = () => {
   showTagDialog.value = false
-  // 延迟清空，避免闪烁
   setTimeout(() => {
     if (!showTagDialog.value) {
       selectedImage.value = null
@@ -747,7 +1161,6 @@ const saveImageTags = async () => {
     const response = await imageApi.updateImageTags(selectedImage.value.id, tagIds) as unknown as { code: number, message?: string }
     
     if (response?.code === 200) {
-      // 更新本地数据
       const imageIndex = images.value.findIndex(img => img.id === selectedImage.value!.id)
       if (imageIndex !== -1) {
         images.value[imageIndex].tags = [...currentImageTags.value]
@@ -781,7 +1194,6 @@ const deleteImage = async (image: Image) => {
     const response = await imageApi.deleteImage(image.id) as unknown as { code: number, message?: string }
     if (response?.code === 200) {
       ElMessage.success('图片删除成功')
-      // 从缓存中移除
       const cacheKey = getImageCacheKey(image)
       delete imageUrls.value[cacheKey]
       await loadImages()
@@ -826,15 +1238,13 @@ watch(
   }
 )
 
-// 监听选中文件变化，使用防抖提示
+// 监听选中文件变化
 watch(selectedFiles, (newVal) => {
   if (newVal.length > 0) {
-    // 清除之前的定时器
     if (fileSelectTimer.value) {
       clearTimeout(fileSelectTimer.value)
     }
     
-    // 设置新的定时器，延迟 300ms 后提示
     fileSelectTimer.value = setTimeout(() => {
       ElMessage.success(`已选择 ${newVal.length} 个文件`)
       fileSelectTimer.value = null
@@ -844,16 +1254,16 @@ watch(selectedFiles, (newVal) => {
 
 // 组件挂载
 onMounted(() => {
+  loadViewMode()
   loadProjects()
   loadTags()
 })
 
-// 组件卸载时清理定时器和缓存
+// 组件卸载时清理
 onUnmounted(() => {
   if (fileSelectTimer.value) {
     clearTimeout(fileSelectTimer.value)
   }
-  // 清理URL缓存
   imageUrls.value = {}
 })
 </script>
@@ -873,12 +1283,71 @@ onUnmounted(() => {
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
+.view-toggle {
+  margin-left: auto;
+}
+
+@media (max-width: 768px) {
+  .gallery-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .view-toggle {
+    margin-left: 0;
+    align-self: center;
+  }
+}
+
+/* 批量操作面板 */
+.batch-panel {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--el-fill-color-extra-light);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.batch-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .batch-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .batch-info {
+    justify-content: center;
+  }
+  
+  .batch-actions {
+    justify-content: center;
+  }
+}
+
+/* 加载状态 */
 .loading-container {
   margin: 40px 0;
 }
 
+/* 网格视图样式 */
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -886,10 +1355,19 @@ onUnmounted(() => {
   margin-bottom: 24px;
 }
 
+@media (max-width: 768px) {
+  .gallery-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+}
+
 .image-card {
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  border: 2px solid var(--el-border-color);
+  box-sizing: border-box;
 }
 
 .image-card:hover {
@@ -902,6 +1380,20 @@ onUnmounted(() => {
 
 .image-card.selected {
   border: 2px solid var(--el-color-primary);
+}
+
+.image-card.batch-selected {
+  border: 2px solid var(--el-color-success);
+  box-shadow: 0 0 0 2px var(--el-color-success-light-9);
+}
+
+.batch-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  border-radius: 4px;
+  padding: 4px;
 }
 
 .image-container {
@@ -994,26 +1486,57 @@ onUnmounted(() => {
   font-size: 11px;
 }
 
+/* 列表视图样式 */
+.gallery-list {
+  margin-bottom: 24px;
+}
+
+.table-image-preview {
+  width: 50px;
+  height: 50px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.table-image-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  background: var(--el-fill-color-light);
+  border-radius: 4px;
+  color: var(--el-text-color-placeholder);
+}
+
+.table-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+:deep(.selected-row) {
+  background-color: var(--el-color-success-light-9) !important;
+}
+
+:deep(.selected-row:hover) {
+  background-color: var(--el-color-success-light-8) !important;
+}
+
+/* 分页容器 */
 .pagination-container {
   display: flex;
   justify-content: center;
   margin-top: 24px;
 }
 
-/* 图片预览对话框样式 */
-.image-preview-dialog :deep(.el-dialog__body) {
-  padding: 20px;
-  text-align: center;
+/* 预览对话框 */
+.image-preview-dialog {
+  border-radius: 12px;
 }
 
 .preview-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.preview-container :deep(.el-image) {
-  overflow-y: auto;
+  text-align: center;
 }
 
 .preview-error {
@@ -1023,40 +1546,33 @@ onUnmounted(() => {
   justify-content: center;
   height: 300px;
   color: var(--el-text-color-placeholder);
-  background: var(--el-fill-color-light);
-  border-radius: 8px;
 }
 
-/* 标签编辑对话框样式 */
+/* 标签编辑对话框 */
 .tag-dialog-content {
-  max-height: 60vh;
-  overflow-y: auto;
+  padding: 0;
 }
 
 .image-preview-small {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 16px;
 }
 
 .image-name h4 {
   margin: 0;
+  font-size: 16px;
   color: var(--el-text-color-primary);
 }
 
 .tag-editor {
-  space-y: 20px;
-}
-
-.current-tags,
-.add-tag-section {
-  margin-bottom: 24px;
+  padding: 0;
 }
 
 .current-tags h5,
 .add-tag-section h5 {
   margin: 0 0 12px 0;
+  font-size: 14px;
   color: var(--el-text-color-primary);
   font-weight: 500;
 }
@@ -1065,20 +1581,18 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-bottom: 24px;
   min-height: 32px;
-  padding: 12px;
-  border: 1px dashed var(--el-border-color);
-  border-radius: 6px;
-  background: var(--el-fill-color-extra-light);
-}
-
-.no-tags {
-  color: var(--el-text-color-placeholder);
-  font-style: italic;
+  align-items: flex-start;
 }
 
 .tag-item {
   margin: 0;
+}
+
+.no-tags {
+  color: var(--el-text-color-placeholder);
+  font-size: 12px;
 }
 
 .add-tag {
@@ -1088,34 +1602,65 @@ onUnmounted(() => {
 }
 
 .dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
+  text-align: right;
 }
 
-@media (max-width: 768px) {
+/* 批量添加标签对话框 */
+.batch-tag-content p {
+  margin: 0 0 16px 0;
+  color: var(--el-text-color-primary);
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
   .image-gallery {
     padding: 16px;
   }
   
-  .gallery-controls {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  
   .gallery-grid {
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 16px;
+    grid-template-columns: 1fr;
   }
   
-  .image-preview-small {
-    flex-direction: column;
-    text-align: center;
+  .image-card .image-actions {
+    opacity: 1;
   }
+  
+  .batch-panel {
+    padding: 12px;
+  }
+  
+  .batch-actions {
+    width: 100%;
+  }
+  
+  .batch-actions .el-button {
+    flex: 1;
+  }
+}
 
-  .image-preview-dialog {
-    width: 95% !important;
+/* 动画效果 */
+.gallery-grid,
+.gallery-list {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 批量选择模式下的视觉反馈 */
+.image-card.batch-selected .image-preview {
+  filter: brightness(0.9);
+}
+
+.image-card.batch-selected:hover .image-preview {
+  filter: brightness(1);
 }
 </style>
