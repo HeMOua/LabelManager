@@ -1,7 +1,10 @@
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 
-class TreeNode(BaseModel):
+from app.core.response import CamelCaseModel
+
+
+class TreeNode(CamelCaseModel):
     name: str
     category: Optional[str] = None
     type: str  # "tag" or "image"

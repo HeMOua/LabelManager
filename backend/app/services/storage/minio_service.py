@@ -1,13 +1,13 @@
+from asyncpg.pgproto.pgproto import timedelta
 from minio import Minio
 from minio.error import S3Error
 import io
-from typing import Optional
+from typing import Optional, Dict, Any
 import logging
 
 from app.core.config import settings
-from app.services.storage.storage_interface import StorageInterface
-
-logger = logging.getLogger(__name__)
+from app.services.storage.base import StorageInterface
+from loguru import logger
 
 class MinioService(StorageInterface):
     def __init__(self):
@@ -73,7 +73,7 @@ class MinioService(StorageInterface):
             return self.client.presigned_get_object(
                 self.bucket_name,
                 object_name,
-                expires=expires
+                expires=timedelta(seconds=expires)
             )
         except S3Error as e:
             logger.error(f"Error getting file URL {object_name}: {e}")
@@ -89,3 +89,20 @@ class MinioService(StorageInterface):
                 return False
             logger.error(f"Error checking file existence {object_name}: {e}")
             return False
+
+    async def get_file_info(self, file_path: str) -> Optional[Dict[str, Any]]:
+        """获取MinIO文件信息"""
+        try:
+            # 使用MinIO客户端获取文件统计信息
+            stat = self.client.stat_object(self.bucket_name, file_path)
+            return {
+                "file_name": file_path.split('/')[-1],
+                "file_size": stat.size,
+                "content_type": stat.content_type,
+                "created_time": stat.last_modified.timestamp() if stat.last_modified else None,
+                "etag": stat.etag,
+                "version_id": stat.version_id
+            }
+        except Exception as e:
+            print(f"Error getting file info: {e}")
+            return None

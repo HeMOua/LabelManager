@@ -2,7 +2,10 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
-class TagBase(BaseModel):
+from app.core.response import CamelCaseModel
+
+
+class TagBase(CamelCaseModel):
     name: str
     category: str
 

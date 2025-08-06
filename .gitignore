@@ -8,5 +8,6 @@ wheels/
 
 # Virtual environments
 backend/.venv
+backend/app/uploads
 .idea
 node_modules

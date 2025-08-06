@@ -2,8 +2,10 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from .tag import Tag
+from ..core.response import CamelCaseModel
 
-class ImageBase(BaseModel):
+
+class ImageBase(CamelCaseModel):
     filename: str
     file_path: str
     thumbnail_path: Optional[str] = None
