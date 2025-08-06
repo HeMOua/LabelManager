@@ -238,6 +238,8 @@
               :src="getImageThumbnail(row)"
               :alt="row.filename || '图片'"
               fit="cover"
+              lazy
+              loading="lazy"
               class="table-image-preview"
               @click.stop="openImagePreview(row)"
               @error="handleImageError(row)"
@@ -837,6 +839,8 @@ const initImageCache = (image: Image) => {
 
 // 获取图片缩略图URL
 const getImageThumbnail = (image: Image): string => {
+  if (!image || Object.keys(image).length === 0) return ''
+
   const cacheKey = initImageCache(image)
   const cache = imageUrls.value[cacheKey]
   
@@ -881,6 +885,8 @@ const getImageFullUrl = (image: Image): string => {
 
 // 异步加载缩略图
 const loadImageThumbnail = async (image: Image, cacheKey: string) => {
+  if (!image) return ''
+
   const cache = imageUrls.value[cacheKey]
   if (cache.thumbnailLoading) return
   
@@ -1537,6 +1543,10 @@ onUnmounted(() => {
 
 .preview-container {
   text-align: center;
+}
+
+.preview-container .el-image {
+  overflow-y: auto;
 }
 
 .preview-error {
