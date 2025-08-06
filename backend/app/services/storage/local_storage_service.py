@@ -1,10 +1,8 @@
 from pathlib import Path
-from typing import Optional
-import logging
-
-from app.services.storage.storage_interface import StorageInterface
-
-logger = logging.getLogger(__name__)
+from typing import Optional, Dict, Any
+from loguru import logger
+from app.services.storage.base import StorageInterface
+from app.utils.web import get_content_type_by_extension
 
 
 class LocalStorageService(StorageInterface):
@@ -87,3 +85,21 @@ class LocalStorageService(StorageInterface):
         except Exception as e:
             logger.error(f"Error checking file existence {object_name}: {e}")
             return False
+
+    async def get_file_info(self, file_path: str) -> Optional[Dict[str, Any]]:
+        """获取本地文件信息"""
+        try:
+            full_path = Path(self.base_path) / file_path
+            if full_path.exists():
+                stat = full_path.stat()
+                return {
+                    "file_name": full_path.name,
+                    "file_size": stat.st_size,
+                    "content_type": get_content_type_by_extension(full_path.suffix),
+                    "created_time": stat.st_ctime,
+                    "modified_time": stat.st_mtime
+                }
+            return None
+        except Exception as e:
+            print(f"Error getting file info: {e}")
+            return None

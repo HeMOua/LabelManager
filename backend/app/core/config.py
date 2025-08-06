@@ -2,6 +2,9 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 class Settings(BaseSettings):
+
+    BASE_URL: str = ""
+
     # 数据库配置
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/label_manager"
     

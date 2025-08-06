@@ -184,32 +184,28 @@
     </div>
 
     <!-- 项目详情侧边栏 -->
-    <div v-if="selectedProject" class="project-details-sidebar">
-      <div class="sidebar-header">
-        <h2>{{ selectedProject.name }}</h2>
-        <button @click="selectedProject = null" class="close-sidebar">×</button>
-      </div>
+    <el-drawer v-model="drawerVisible" class="project-details-sidebar" :title="selectedProject?.name" header-class="sidebar-title">
       
       <div class="sidebar-content">
         <div class="detail-section">
           <h3>基本信息</h3>
           <div class="detail-item">
             <label>状态:</label>
-            <span class="status-badge" :class="selectedProject.status">
-              {{ getStatusText(selectedProject.status) }}
+            <span class="status-badge" :class="selectedProject?.status">
+              {{ getStatusText(selectedProject?.status) }}
             </span>
           </div>
           <div class="detail-item">
             <label>描述:</label>
-            <p>{{ selectedProject.description || '无描述' }}</p>
+            <p>{{ selectedProject?.description || '无描述' }}</p>
           </div>
           <div class="detail-item">
             <label>创建时间:</label>
-            <span>{{ formatDate(selectedProject.createdAt) }}</span>
+            <span>{{ formatDate(selectedProject?.createdAt) }}</span>
           </div>
           <div class="detail-item">
             <label>最后更新:</label>
-            <span>{{ formatDate(selectedProject.updatedAt) }}</span>
+            <span>{{ formatDate(selectedProject?.updatedAt) }}</span>
           </div>
         </div>
 
@@ -217,19 +213,19 @@
           <h3>数据统计</h3>
           <div class="stats-grid">
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject.imageCount }}</div>
+              <div class="stats-number">{{ selectedProject?.imageCount }}</div>
               <div class="stats-label">总图片</div>
             </div>
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject.tagCount }}</div>
+              <div class="stats-number">{{ selectedProject?.tagCount }}</div>
               <div class="stats-label">标签数</div>
             </div>
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject.labeledImages }}</div>
+              <div class="stats-number">{{ selectedProject?.labeledImages }}</div>
               <div class="stats-label">已标注</div>
             </div>
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject.labelProgress }}%</div>
+              <div class="stats-number">{{ selectedProject?.labelProgress }}%</div>
               <div class="stats-label">完成度</div>
             </div>
           </div>
@@ -282,7 +278,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </el-drawer>
 
     <!-- 创建/编辑对话框 -->
     <div v-if="showCreateDialog || showEditDialog" class="dialog-overlay" @click="closeDialogs">
@@ -322,10 +318,12 @@
 
 <script setup lang="ts">
 import type { Project, Tag } from '@/types/index'
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { projectApi } from '@/api/project'
 import type { FormRules } from 'element-plus'
+import { showConfirm } from '@/utils/messageBox'
+import { addTabFromMenu } from '@/utils/menuList'
 
 const router = useRouter()
 
@@ -347,6 +345,13 @@ const projectForm = reactive({
   name: '',
   description: '',
   status: 'active',
+})
+
+const drawerVisible = ref(false)
+watch(drawerVisible, (visible) => {
+  if (!visible) {
+    selectedProject.value = null
+  }
 })
 
 const rules = reactive<FormRules<typeof projectForm>>({
@@ -429,6 +434,7 @@ const toggleSortOrder = () => {
 }
 
 const selectProject = (project: Project) => {
+  drawerVisible.value = true
   selectedProject.value = project
   loadProjectDetails(project.id)
 }
@@ -468,19 +474,22 @@ const editProject = (project: Project) => {
 }
 
 const duplicateProject = async (project: Project) => {
-  if (confirm(`确定要复制项目 "${project.name}" 吗？`)) {
+  try {
+    await showConfirm(`确定要复制项目 \"${project.name}\" 吗？`, '提示')
     console.log('复制项目:', project)
     // 实现复制逻辑
     await loadProjects()
+  } catch {
+    // 用户取消，无需处理
   }
 }
 
 const deleteProject = async (project: Project) => {
-  if (confirm(`确定要删除项目 "${project.name}" 吗？此操作不可恢复！`)) {
-    console.log('删除项目:', project)
-    // 实现删除逻辑
+  try {
+    await showConfirm(`确定要删除项目 \"${project.name}\" 吗？此操作不可恢复！`, '警告')
+    projectApi.deleteProject(project.id)
     await loadProjects()
-  }
+  } catch {}
 }
 
 const resetProjectForm = () => {
@@ -513,11 +522,13 @@ const saveProject = async () => {
 }
 
 const goToGallery = (project: Project) => {
-  router.push({ name: 'ImageGallery', query: { project: project.id } })
+  addTabFromMenu('/gallery')
+  router.push({ path: '/gallery', query: { project: project.id } })
 }
 
 const goToTags = (project: Project) => {
-  router.push({ name: 'TagManagement', query: { project: project.id } })
+  addTabFromMenu('/tags')
+  router.push({ path: '/tags', query: { project: project.id } })
 }
 
 const exportProject = (project: Project) => {
@@ -901,42 +912,9 @@ onMounted(() => {
   color: white;
 }
 
-.project-details-sidebar {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 450px;
-  height: 100vh;
-  background-color: white;
-  border-left: 1px solid #e0e0e0;
-  z-index: 1000;
-  overflow-y: auto;
-}
-
-.sidebar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid #e0e0e0;
-  background-color: #f8f9fa;
-}
-
-.sidebar-header h2 {
-  margin: 0;
-  color: #333;
-}
-
-.close-sidebar {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-}
-
-.sidebar-content {
-  padding: 20px;
+::v-deep(.sidebar-title) > span {
+  font-size: 1.5rem;
+  font-weight: bold;
 }
 
 .detail-section {

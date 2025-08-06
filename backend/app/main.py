@@ -14,7 +14,7 @@ from app.services.storage.storage_service import get_storage_service
 async def lifespan(application: FastAPI):
     """ 应用生命周期管理 """
     # 初始化数据库
-    await init_db()
+    # await init_db()
 
     # 初始化存储服务
     storage_service = get_storage_service()

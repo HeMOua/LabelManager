@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Dict, Any
 
 
 class StorageInterface(ABC):
@@ -33,4 +33,9 @@ class StorageInterface(ABC):
     @abstractmethod
     async def file_exists(self, object_name: str) -> bool:
         """检查文件是否存在"""
+        pass
+
+    @abstractmethod
+    async def get_file_info(self, file_path: str) -> Optional[Dict[str, Any]]:
+        """获取文件信息"""
         pass

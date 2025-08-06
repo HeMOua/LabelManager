@@ -1,5 +1,7 @@
 import { ref } from "vue";
 import type { MenuItem } from "@/types/index";
+import { useTabsStore } from "@/stores/tabs";
+
 
 export const menuList =  ref<MenuItem[]>([
   {
@@ -33,3 +35,16 @@ export const menuList =  ref<MenuItem[]>([
     path: '/tags'
   }
 ]);
+
+export const addTabFromMenu = (path: string) => {
+  const menuItem = menuList.value.find(item => item.path === path);
+  if (menuItem) {
+    const tabsStore = useTabsStore()
+    tabsStore.addTab({
+      name: menuItem.path?.replace(/\//g, '-').substring(1) || 'dashboard',
+      title: menuItem.title,
+      path: menuItem.path || '/',
+      closable: menuItem.closable || true,
+    })
+  }
+}
