@@ -193,6 +193,7 @@
             loading="lazy"
             @click="handleImageClick(image)"
             @error="handleImageError(image)"
+            :ref="(el) => setImageRef(el, getImageCacheKey(image))"
           >
             <template #placeholder>
               <div class="image-placeholder">
@@ -301,6 +302,7 @@
               class="table-image-preview"
               @click.stop="openImagePreview(row)"
               @error="handleImageError(row)"
+             :ref="(el) => setImageRef(el, getImageCacheKey(row))"
             >
               <template #error>
                 <div class="table-image-error">
@@ -582,6 +584,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { Upload, UploadFilled, Plus, View, Edit, Delete, Picture, Loading, Grid, List } from '@element-plus/icons-vue'
+import { useImageLazyLoad } from '@/hooks/useImageLazyLoad'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Image, Tag, Project } from '@/types/index'
 import { projectApi } from '@/api/project'
@@ -589,6 +592,15 @@ import { useRoute } from 'vue-router'
 import { tagApi } from '@/api/tags'
 import { imageApi } from '@/api/image'
 import { fileApi } from '@/api/file'
+
+const {
+  setImageRef,
+  isImageVisible,
+  clearVisible
+} = useImageLazyLoad({
+  rootMargin: '50px',
+  threshold: 0.1
+})
 
 const route = useRoute()
 
@@ -983,13 +995,18 @@ const getImageThumbnail = (image: Image): string => {
   if (cache.thumbnailUrl && !cache.thumbnailError) {
     return cache.thumbnailUrl
   }
-  
+
   if (image.url) {
     cache.thumbnailUrl = image.url
     return image.url
   }
-  
-  if (cache.thumbnailLoading) {
+
+  // 添加更严格的检查，避免重复调用
+  if (cache.thumbnailLoading || cache.thumbnailUrl) {
+    return cache.thumbnailUrl || ''
+  }
+
+  if (!isImageVisible(cacheKey)) {
     return ''
   }
   
@@ -1187,6 +1204,7 @@ const onProjectChange = () => {
   currentPage.value = 1
   imageUrls.value = {}
   selectedImages.value = []
+  clearVisible()
   loadImages()
 }
 
