@@ -70,6 +70,64 @@
         </template>
       </el-page-header>
       
+      <!-- 待上传图片预览容器 -->
+      <div v-if="selectedFiles.length > 0" class="upload-preview-panel">
+        <div class="upload-preview-header">
+          <h4>待上传图片 ({{ selectedFiles.length }})</h4>
+          <el-button 
+            size="small" 
+            type="danger" 
+            text
+            @click="clearAllFiles"
+            :icon="Delete"
+          >
+            清空
+          </el-button>
+        </div>
+        
+        <div class="upload-preview-container">
+          <div 
+            v-for="(file, index) in selectedFiles" 
+            :key="`${file.name}-${file.size}-${index}`"
+            class="upload-preview-item"
+          >
+            <div class="preview-image-wrapper">
+              <img 
+                :src="getFilePreviewUrl(file)" 
+                :alt="file.name"
+                class="preview-image"
+                @error="handlePreviewError($event, file)"
+                @load="handlePreviewLoad($event, file)"
+              />
+              <div class="preview-loading" v-if="!filePreviewStates[getFileKey(file)]?.loaded">
+                <el-icon class="loading-icon"><Loading /></el-icon>
+              </div>
+              <div class="preview-overlay">
+                <div class="preview-actions">
+                  <el-button 
+                    size="small" 
+                    circle 
+                    type="danger"
+                    :icon="Delete"
+                    @click="removeFileFromSelection(index)"
+                    title="移除"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div class="preview-info">
+              <div class="file-name" :title="file.name">
+                {{ truncateText(file.name, 15) }}
+              </div>
+              <div class="file-size">
+                {{ formatFileSize(file.size) }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <!-- 批量操作面板 -->
       <div v-if="batchMode" class="batch-panel">
         <div class="batch-info">
@@ -545,6 +603,10 @@ const projects = ref<Project[]>([])
 const availableTags = ref<Tag[]>([])
 const selectedFiles = ref<File[]>([])
 
+// 文件预览相关
+const filePreviewUrls = ref<Record<string, string>>({})
+const filePreviewStates = ref<Record<string, { loaded: boolean; error: boolean }>>({})
+
 // 批量选择相关
 const batchMode = ref(false)
 const selectedImages = ref<number[]>([])
@@ -640,6 +702,80 @@ const formatDate = (dateString: string) => {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+// 文件大小格式化
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
+
+// 文件预览相关方法
+const getFileKey = (file: File): string => {
+  return `${file.name}-${file.size}-${file.lastModified}`
+}
+
+const getFilePreviewUrl = (file: File): string => {
+  const key = getFileKey(file)
+  if (!filePreviewUrls.value[key]) {
+    filePreviewUrls.value[key] = URL.createObjectURL(file)
+    filePreviewStates.value[key] = { loaded: false, error: false }
+  }
+  return filePreviewUrls.value[key]
+}
+
+const handlePreviewLoad = (event: Event, file: File) => {
+  const key = getFileKey(file)
+  if (filePreviewStates.value[key]) {
+    filePreviewStates.value[key].loaded = true
+    filePreviewStates.value[key].error = false
+  }
+}
+
+const handlePreviewError = (event: Event, file: File) => {
+  const key = getFileKey(file)
+  if (filePreviewStates.value[key]) {
+    filePreviewStates.value[key].loaded = true
+    filePreviewStates.value[key].error = true
+  }
+}
+
+const removeFileFromSelection = (index: number) => {
+  const removedFile = selectedFiles.value[index]
+  const key = getFileKey(removedFile)
+  
+  // 清理预览URL
+  if (filePreviewUrls.value[key]) {
+    URL.revokeObjectURL(filePreviewUrls.value[key])
+    delete filePreviewUrls.value[key]
+    delete filePreviewStates.value[key]
+  }
+  
+  // 从选择列表中移除
+  selectedFiles.value.splice(index, 1)
+  
+  uploadRef.value?.clearFiles()
+  
+  ElMessage.success('已移除文件')
+}
+
+const clearAllFiles = () => {
+  // 清理所有预览URL
+  Object.values(filePreviewUrls.value).forEach(url => {
+    URL.revokeObjectURL(url)
+  })
+  
+  filePreviewUrls.value = {}
+  filePreviewStates.value = {}
+  selectedFiles.value = []
+  
+  // 清理上传组件
+  uploadRef.value?.clearFiles()
+  
+  ElMessage.success('已清空所有文件')
 }
 
 // 视图模式持久化
@@ -1088,8 +1224,8 @@ const uploadImages = async () => {
     
     ElMessage.success(`成功上传 ${successCount}/${selectedFiles.value.length} 张图片`)
     
-    selectedFiles.value = []
-    uploadRef.value?.clearFiles()
+    // 清理文件选择
+    clearAllFiles()
     
     await loadImages()
     
@@ -1270,7 +1406,15 @@ onUnmounted(() => {
   if (fileSelectTimer.value) {
     clearTimeout(fileSelectTimer.value)
   }
+  
+  // 清理所有预览URL
+  Object.values(filePreviewUrls.value).forEach(url => {
+    URL.revokeObjectURL(url)
+  })
+  
   imageUrls.value = {}
+  filePreviewUrls.value = {}
+  filePreviewStates.value = {}
 })
 </script>
 
@@ -1305,6 +1449,184 @@ onUnmounted(() => {
   .view-toggle {
     margin-left: 0;
     align-self: center;
+  }
+}
+
+/* 待上传图片预览面板 */
+.upload-preview-panel {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--el-fill-color-extra-light);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.upload-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.upload-preview-header h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+}
+
+.upload-preview-container {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.upload-preview-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.upload-preview-container::-webkit-scrollbar-track {
+  background: var(--el-fill-color-lighter);
+  border-radius: 3px;
+}
+
+.upload-preview-container::-webkit-scrollbar-thumb {
+  background: var(--el-border-color);
+  border-radius: 3px;
+}
+
+.upload-preview-container::-webkit-scrollbar-thumb:hover {
+  background: var(--el-border-color-darker);
+}
+
+.upload-preview-item {
+  flex-shrink: 0;
+  width: 120px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-lighter);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.upload-preview-item:hover {
+  border-color: var(--el-color-primary-light-5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.preview-image-wrapper {
+  position: relative;
+  width: 100%;
+  height: 80px;
+  overflow: hidden;
+  background: var(--el-fill-color-light);
+}
+
+.preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s ease;
+}
+
+.upload-preview-item:hover .preview-image {
+  transform: scale(1.05);
+}
+
+.preview-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--el-text-color-secondary);
+}
+
+.preview-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.upload-preview-item:hover .preview-overlay {
+  opacity: 1;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.preview-info {
+  padding: 8px;
+  background: white;
+}
+
+.file-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+  margin-bottom: 4px;
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.file-size {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .upload-preview-panel {
+    padding: 12px;
+  }
+  
+  .upload-preview-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .upload-preview-item {
+    width: 100px;
+  }
+  
+  .preview-image-wrapper {
+    height: 70px;
+  }
+}
+
+@media (max-width: 480px) {
+  .upload-preview-container {
+    gap: 8px;
+  }
+  
+  .upload-preview-item {
+    width: 80px;
+  }
+  
+  .preview-image-wrapper {
+    height: 60px;
+  }
+  
+  .preview-info {
+    padding: 6px;
   }
 }
 
@@ -1654,6 +1976,10 @@ onUnmounted(() => {
   animation: fadeIn 0.3s ease-in-out;
 }
 
+.upload-preview-panel {
+  animation: slideDown 0.3s ease-out;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -1665,6 +1991,19 @@ onUnmounted(() => {
   }
 }
 
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 200px;
+  }
+}
+
 /* 批量选择模式下的视觉反馈 */
 .image-card.batch-selected .image-preview {
   filter: brightness(0.9);
@@ -1672,5 +2011,18 @@ onUnmounted(() => {
 
 .image-card.batch-selected:hover .image-preview {
   filter: brightness(1);
+}
+
+/* 待上传预览项的错误状态 */
+.upload-preview-item .preview-image[src=""] {
+  background: var(--el-fill-color-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-preview-item .preview-image[src=""]:after {
+  content: "❌";
+  font-size: 24px;
 }
 </style>
