@@ -1,17 +1,35 @@
 <template>
   <div class="tag-management">
-    <el-page-header @back="$router.go(-1)" content="标签管理">
-      <template #extra>
-        <el-button type="primary" :icon="Plus" @click="showCreateDialog = true">
-          创建标签
-        </el-button>
-      </template>
-    </el-page-header>
+    <div class="tag-management-header">
+      <el-page-header @back="$router.go(-1)" content="标签管理">
+        <template #extra>
+          <div class="tag-controls">
+            <el-button type="primary" :icon="Plus" @click="showCreateDialog = true">
+              创建标签
+            </el-button>
+          </div>
+        </template>
+      </el-page-header>
+    </div>
 
     <el-card class="filter-card" shadow="never">
       <el-row :gutter="16">
         <el-col :span="6">
-          <el-select v-model="selectedProject" @change="loadTags" placeholder="选择项目" clearable>
+          <el-select v-model="selectedTagType" @change="loadTags" placeholder="标签类型">
+            <el-option label="全部标签" value="all" />
+            <el-option label="全局标签" value="global" />
+            <el-option label="项目标签" value="project" />
+          </el-select>
+        </el-col>
+        
+        <el-col :span="6">
+          <el-select 
+            v-model="selectedProject" 
+            @change="loadTags" 
+            placeholder="选择项目" 
+            clearable
+            :disabled="selectedTagType === 'global'"
+          >
             <el-option label="所有项目" value="" />
             <el-option
               v-for="project in projects"
@@ -27,14 +45,14 @@
             <el-option label="所有分类" value="" />
             <el-option
               v-for="category in categories"
-              :key="category.id"
-              :label="category.name"
-              :value="category.id"
+              :key="category"
+              :label="category"
+              :value="category"
             />
           </el-select>
         </el-col>
         
-        <el-col :span="8">
+        <el-col :span="6">
           <el-input
             v-model="searchQuery"
             @input="filterTags"
@@ -43,38 +61,58 @@
             clearable
           />
         </el-col>
-        
-        <el-col :span="4">
-          <el-button-group>
-            <el-button
-              :type="viewMode === 'grid' ? 'primary' : 'default'"
-              @click="viewMode = 'grid'"
-              :icon="Grid"
-            />
-            <el-button
-              :type="viewMode === 'list' ? 'primary' : 'default'"
-              @click="viewMode = 'list'"
-              :icon="List"
-            />
-          </el-button-group>
+      </el-row>
+      
+      <el-row :gutter="8" style="margin-top: 16px;">
+        <el-col :span="18">
+          <div class="quick-filters">
+            <el-button-group>
+              <el-button
+                :type="viewMode === 'grid' ? 'primary' : 'default'"
+                @click="viewMode = 'grid'"
+                :icon="Grid"
+              />
+              <el-button
+                :type="viewMode === 'list' ? 'primary' : 'default'"
+                @click="viewMode = 'list'"
+                :icon="List"
+              />
+            </el-button-group>
+          </div>
+        </el-col>
+        <el-col :span="6">
+          <div class="batch-actions" v-if="selectedTagType === 'global'">
+            <el-button 
+              type="info" 
+              icon="CopyDocument"
+              @click="showCopyDialog = true"
+              :disabled="!filteredTags.length"
+            >
+              复制到项目
+            </el-button>
+          </div>
         </el-col>
       </el-row>
     </el-card>
 
-    <el-row :gutter="16" class="statistics-row">
-      <el-col :span="6">
-        <el-statistic title="总标签数" :value="filteredTags.length" />
-      </el-col>
-      <el-col :span="6">
-        <el-statistic title="已使用" :value="usedTagsCount" />
-      </el-col>
-      <el-col :span="6">
-        <el-statistic title="未使用" :value="unusedTagsCount" />
-      </el-col>
-      <el-col :span="6">
-        <el-statistic title="使用率" :value="usageRate" suffix="%" />
-      </el-col>
-    </el-row>
+    <div class="project-statistics">
+      <div class="stat-card">
+        <h3>总标签数</h3>
+        <div class="stat-number">{{ filteredTags.length }}</div>
+      </div>
+      <div class="stat-card">
+        <h3>全局标签</h3>
+        <div class="stat-number">{{ globalTagsCount }}</div>
+      </div>
+      <div class="stat-card">
+        <h3>项目标签</h3>
+        <div class="stat-number">{{ projectTagsCount }}</div>
+      </div>
+      <div class="stat-card">
+        <h3>已使用</h3>
+        <div class="stat-number">{{ usedTagsCount }}</div>
+      </div>
+    </div>
 
     <el-card class="content-card" shadow="never">
       <template #header>
@@ -83,8 +121,8 @@
           <div class="sort-controls">
             <el-select v-model="sortBy" @change="sortTags" style="width: 120px;">
               <el-option label="名称" value="name" />
-              <el-option label="使用次数" value="usageCount" />
-              <el-option label="创建时间" value="createdAt" />
+              <el-option label="使用次数" value="image_count" />
+              <el-option label="创建时间" value="created_at" />
             </el-select>
             <el-button
               @click="toggleSortOrder"
@@ -106,15 +144,27 @@
         >
           <div class="tag-color-bar" :style="{ backgroundColor: tag.color }"></div>
           <div class="tag-info">
-            <h3>{{ tag.name }}</h3>
-            <el-tag size="small" type="info">{{ getCategoryName(tag.categoryId) }}</el-tag>
+            <div class="tag-header">
+              <h3>{{ tag.name }}</h3>
+              <el-tag 
+                :type="tag.is_global ? 'success' : 'info'" 
+                size="small"
+                class="tag-type"
+              >
+                {{ tag.is_global ? '全局' : '项目' }}
+              </el-tag>
+            </div>
+            <el-tag size="small" type="warning">{{ tag.category }}</el-tag>
+            <div class="project-info" v-if="!tag.is_global && tag.project_name">
+              <el-tag size="small" type="primary">{{ tag.project_name }}</el-tag>
+            </div>
             <div class="tag-stats">
               <el-statistic 
                 title="使用次数" 
-                :value="tag.usageCount" 
+                :value="tag.image_count" 
                 :value-style="{ fontSize: '14px' }" 
               />
-              <span class="created-date">{{ formatDate(tag.createdAt) }}</span>
+              <span class="created-date">{{ formatDate(tag.created_at) }}</span>
             </div>
           </div>
           <div class="tag-actions">
@@ -132,15 +182,31 @@
             </template>
           </el-table-column>
           <el-table-column property="name" label="名称" />
-          <el-table-column label="分类">
+          <el-table-column label="类型" width="80">
             <template #default="{ row }">
-              <el-tag size="small" type="info">{{ getCategoryName(row.categoryId) }}</el-tag>
+              <el-tag :type="row.is_global ? 'success' : 'info'" size="small">
+                {{ row.is_global ? '全局' : '项目' }}
+              </el-tag>
             </template>
           </el-table-column>
-          <el-table-column property="usageCount" label="使用次数" />
-          <el-table-column label="创建时间">
+          <el-table-column label="分类">
             <template #default="{ row }">
-              {{ formatDate(row.createdAt) }}
+              <el-tag size="small" type="warning">{{ row.category }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="所属项目" width="120">
+            <template #default="{ row }">
+              <el-tag v-if="!row.is_global && row.project_name" size="small" type="primary">
+                {{ row.project_name }}
+              </el-tag>
+              <span v-else-if="row.is_global" class="global-indicator">-</span>
+              <span v-else class="unknown-project">未知项目</span>
+            </template>
+          </el-table-column>
+          <el-table-column property="image_count" label="使用次数" width="100" />
+          <el-table-column label="创建时间" width="150">
+            <template #default="{ row }">
+              {{ formatDate(row.created_at) }}
             </template>
           </el-table-column>
           <el-table-column label="操作" width="120">
@@ -165,17 +231,22 @@
           <el-descriptions-item label="颜色">
             <div class="color-display" :style="{ backgroundColor: selectedTag.color }"></div>
           </el-descriptions-item>
-          <el-descriptions-item label="分类">
-            {{ getCategoryName(selectedTag.categoryId) }}
+          <el-descriptions-item label="类型">
+            <el-tag :type="selectedTag.is_global ? 'success' : 'info'">
+              {{ selectedTag.is_global ? '全局标签' : '项目标签' }}
+            </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="描述">
-            {{ selectedTag.description || '无描述' }}
+          <el-descriptions-item label="分类">
+            {{ selectedTag.category }}
+          </el-descriptions-item>
+          <el-descriptions-item label="所属项目" v-if="!selectedTag.is_global">
+            {{ selectedTag.project_name || '未知项目' }}
           </el-descriptions-item>
           <el-descriptions-item label="使用次数">
-            {{ selectedTag.usageCount }}
+            {{ selectedTag.image_count }}
           </el-descriptions-item>
           <el-descriptions-item label="创建时间">
-            {{ formatDate(selectedTag.createdAt) }}
+            {{ formatDate(selectedTag.created_at) }}
           </el-descriptions-item>
         </el-descriptions>
 
@@ -201,17 +272,49 @@
       width="500px"
     >
       <el-form ref="tagFormRef" :model="tagForm" :rules="tagFormRules" label-width="80px">
+        <el-form-item label="标签类型" prop="tag_type">
+          <el-radio-group v-model="tagForm.tag_type" :disabled="showEditDialog">
+            <el-radio label="global">全局标签</el-radio>
+            <el-radio label="project">项目标签</el-radio>
+          </el-radio-group>
+          <div class="form-help-text">
+            <span v-if="tagForm.tag_type === 'global'">全局标签可以在所有项目中使用</span>
+            <span v-else>项目标签只能在指定项目中使用</span>
+          </div>
+        </el-form-item>
+        
+        <el-form-item 
+          label="所属项目" 
+          prop="project_id"
+          v-if="tagForm.tag_type === 'project'"
+        >
+          <el-select v-model="tagForm.project_id" placeholder="选择项目" style="width: 100%">
+            <el-option
+              v-for="project in projects"
+              :key="project.id"
+              :label="project.name"
+              :value="project.id"
+            />
+          </el-select>
+        </el-form-item>
+        
         <el-form-item label="标签名称" prop="name">
           <el-input v-model="tagForm.name" placeholder="请输入标签名称" />
         </el-form-item>
         
-        <el-form-item label="分类" prop="categoryId">
-          <el-select v-model="tagForm.categoryId" placeholder="选择分类" style="width: 100%">
+        <el-form-item label="分类" prop="category">
+          <el-select 
+            v-model="tagForm.category" 
+            placeholder="选择或输入分类" 
+            style="width: 100%"
+            filterable
+            allow-create
+          >
             <el-option
               v-for="category in categories"
-              :key="category.id"
-              :label="category.name"
-              :value="category.id"
+              :key="category"
+              :label="category"
+              :value="category"
             />
           </el-select>
         </el-form-item>
@@ -231,364 +334,453 @@
             </div>
           </div>
         </el-form-item>
-        
-        <el-form-item label="描述">
-          <el-input 
-            v-model="tagForm.description" 
-            type="textarea" 
-            :rows="3" 
-            placeholder="请输入描述（可选）"
-          />
-        </el-form-item>
       </el-form>
       
       <template #footer>
         <el-button @click="closeDialogs">取消</el-button>
-        <el-button type="primary" @click="saveTag">保存</el-button>
+        <el-button type="primary" @click="saveTag" :loading="saving">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 复制标签到项目对话框 -->
+    <el-dialog
+      v-model="showCopyDialog"
+      title="复制全局标签到项目"
+      width="600px"
+    >
+      <div class="copy-dialog-content">
+        <el-form :model="copyForm" label-width="100px">
+          <el-form-item label="目标项目" required>
+            <el-select v-model="copyForm.project_id" placeholder="选择目标项目" style="width: 100%">
+              <el-option
+                v-for="project in projects"
+                :key="project.id"
+                :label="project.name"
+                :value="project.id"
+              />
+            </el-select>
+          </el-form-item>
+          
+          <el-form-item label="选择标签">
+            <div class="tag-selection">
+              <div class="selection-header">
+                <el-checkbox 
+                  v-model="selectAllGlobalTags"
+                  :indeterminate="isGlobalTagsIndeterminate"
+                  @change="handleSelectAllGlobalTags"
+                >
+                  全选 ({{ copyForm.tag_ids.length }}/{{ globalTags.length }})
+                </el-checkbox>
+              </div>
+              <div class="tag-list">
+                <el-checkbox-group v-model="copyForm.tag_ids">
+                  <div 
+                    v-for="tag in globalTags" 
+                    :key="tag.id"
+                    class="tag-checkbox-item"
+                  >
+                    <el-checkbox :label="tag.id">
+                      <div class="tag-display">
+                        <div 
+                          class="tag-color-dot" 
+                          :style="{ backgroundColor: tag.color }"
+                        ></div>
+                        <span class="tag-name">{{ tag.name }}</span>
+                        <el-tag size="small" type="warning">{{ tag.category }}</el-tag>
+                      </div>
+                    </el-checkbox>
+                  </div>
+                </el-checkbox-group>
+              </div>
+            </div>
+          </el-form-item>
+        </el-form>
+      </div>
+      
+      <template #footer>
+        <el-button @click="showCopyDialog = false">取消</el-button>
+        <el-button 
+          type="primary" 
+          @click="copyTagsToProject"
+          :loading="copying"
+          :disabled="!copyForm.project_id || !copyForm.tag_ids.length"
+        >
+          复制标签 ({{ copyForm.tag_ids.length }})
+        </el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
-<script>
-import { ref, reactive, computed, onMounted } from 'vue'
+<script setup lang="ts">
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Plus, Search, Grid, List, Edit, Delete, 
-  SortUp, SortDown 
+  SortUp, SortDown, CopyDocument
 } from '@element-plus/icons-vue'
+import { tagApi } from '@/api/tags'
+import { projectApi } from '@/api/project'
 
-export default {
-  name: 'TagManagement',
-  setup() {
-    const tags = ref([])
-    const filteredTags = ref([])
-    const selectedTag = ref(null)
-    const selectedProject = ref('')
-    const selectedCategory = ref('')
-    const searchQuery = ref('')
-    const sortBy = ref('name')
-    const sortOrder = ref('asc')
-    const viewMode = ref('grid')
-    const showCreateDialog = ref(false)
-    const showEditDialog = ref(false)
-    const showTagDetails = ref(false)
-    const projects = ref([])
-    const categories = ref([])
-    const tagImages = ref([])
-    const tagFormRef = ref()
+interface Tag {
+  id: number
+  name: string
+  category: string
+  color: string
+  project_id: number | null
+  created_at: string
+  tag_type: 'global' | 'project'
+  is_global: boolean
+  image_count: number
+  project_name?: string
+}
 
-    const tagForm = reactive({
-      id: null,
-      name: '',
-      categoryId: '',
-      color: '#409EFF',
-      description: ''
-    })
+interface Project {
+  id: number
+  name: string
+}
 
-    const tagFormRules = {
-      name: [
-        { required: true, message: '请输入标签名称', trigger: 'blur' }
-      ],
-      categoryId: [
-        { required: true, message: '请选择分类', trigger: 'change' }
-      ]
-    }
+const tags = ref<Tag[]>([])
+const filteredTags = ref<Tag[]>([])
+const selectedTag = ref<Tag | null>(null)
+const selectedTagType = ref('all')
+const selectedProject = ref<number | string>('')
+const selectedCategory = ref('')
+const searchQuery = ref('')
+const sortBy = ref('name')
+const sortOrder = ref('asc')
+const viewMode = ref('grid')
+const showCreateDialog = ref(false)
+const showEditDialog = ref(false)
+const showTagDetails = ref(false)
+const showCopyDialog = ref(false)
+const projects = ref<Project[]>([])
+const categories = ref<string[]>([])
+const tagImages = ref([])
+const tagFormRef = ref()
+const saving = ref(false)
+const copying = ref(false)
 
-    const showDialog = computed(() => showCreateDialog.value || showEditDialog.value)
+const tagForm = reactive({
+  id: null as number | null,
+  name: '',
+  category: '',
+  color: '#409EFF',
+  tag_type: 'global' as 'global' | 'project',
+  project_id: null as number | null
+})
 
-    const presetColors = [
-      '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57',
-      '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#ff9f43',
-      '#a55eea', '#26de81', '#fd79a8', '#fdcb6e', '#6c5ce7'
-    ]
+const copyForm = reactive({
+  project_id: null as number | null,
+  tag_ids: [] as number[]
+})
 
-    const usedTagsCount = computed(() => {
-      return filteredTags.value.filter(tag => tag.usageCount > 0).length
-    })
-
-    const unusedTagsCount = computed(() => {
-      return filteredTags.value.filter(tag => tag.usageCount === 0).length
-    })
-
-    const usageRate = computed(() => {
-      if (filteredTags.value.length === 0) return 0
-      return Math.round((usedTagsCount.value / filteredTags.value.length) * 100)
-    })
-
-    const sortedTags = computed(() => {
-      const sorted = [...filteredTags.value].sort((a, b) => {
-        let aVal = a[sortBy.value]
-        let bVal = b[sortBy.value]
-        
-        if (sortBy.value === 'createdAt') {
-          aVal = new Date(aVal)
-          bVal = new Date(bVal)
-        }
-        
-        if (sortOrder.value === 'asc') {
-          return aVal > bVal ? 1 : -1
+const tagFormRules = {
+  name: [
+    { required: true, message: '请输入标签名称', trigger: 'blur' }
+  ],
+  category: [
+    { required: true, message: '请输入分类', trigger: 'blur' }
+  ],
+  tag_type: [
+    { required: true, message: '请选择标签类型', trigger: 'change' }
+  ],
+  project_id: [
+    {
+      validator: (rule: any, value: any, callback: any) => {
+        if (tagForm.tag_type === 'project' && !value) {
+          callback(new Error('请选择所属项目'))
         } else {
-          return aVal < bVal ? 1 : -1
+          callback()
         }
-      })
-      return sorted
-    })
-
-    const loadProjects = async () => {
-      projects.value = [
-        { id: 1, name: '项目A' },
-        { id: 2, name: '项目B' },
-        { id: 3, name: '项目C' }
-      ]
+      },
+      trigger: 'change'
     }
+  ]
+}
 
-    const loadCategories = async () => {
-      categories.value = [
-        { id: 1, name: '人物分类' },
-        { id: 2, name: '动物分类' },
-        { id: 3, name: '建筑分类' },
-        { id: 4, name: '风景分类' },
-        { id: 5, name: '车辆分类' }
-      ]
+const showDialog = computed(() => showCreateDialog.value || showEditDialog.value)
+
+const presetColors = [
+  '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57',
+  '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#ff9f43',
+  '#a55eea', '#26de81', '#fd79a8', '#fdcb6e', '#6c5ce7'
+]
+
+const globalTagsCount = computed(() => {
+  return filteredTags.value.filter(tag => tag.is_global).length
+})
+
+const projectTagsCount = computed(() => {
+  return filteredTags.value.filter(tag => !tag.is_global).length
+})
+
+const usedTagsCount = computed(() => {
+  return filteredTags.value.filter(tag => tag.image_count > 0).length
+})
+
+const sortedTags = computed(() => {
+  const sorted = [...filteredTags.value].sort((a, b) => {
+    let aVal = a[sortBy.value as keyof Tag]
+    let bVal = b[sortBy.value as keyof Tag]
+    
+    if (sortBy.value === 'created_at') {
+      aVal = new Date(aVal as string).getTime()
+      bVal = new Date(bVal as string).getTime()
     }
+    
+    if (sortOrder.value === 'asc') {
+      return aVal > bVal ? 1 : -1
+    } else {
+      return aVal < bVal ? 1 : -1
+    }
+  })
+  return sorted
+})
 
-    const loadTags = async () => {
-      // 模拟标签数据
-      tags.value = [
-        {
-          id: 1,
-          name: '成人',
-          categoryId: 1,
-          color: '#ff6b6b',
-          description: '成年人物标签',
-          usageCount: 15,
-          createdAt: new Date('2024-01-15'),
-          projectId: 1
-        },
-        {
-          id: 2,
-          name: '儿童',
-          categoryId: 1,
-          color: '#ff8e8e',
-          description: '儿童人物标签',
-          usageCount: 8,
-          createdAt: new Date('2024-01-16'),
-          projectId: 1
-        },
-        {
-          id: 3,
-          name: '猫',
-          categoryId: 2,
-          color: '#4ecdc4',
-          description: '猫科动物',
-          usageCount: 12,
-          createdAt: new Date('2024-01-17'),
-          projectId: 2
-        },
-        {
-          id: 4,
-          name: '狗',
-          categoryId: 2,
-          color: '#6ed5cd',
-          description: '犬科动物',
-          usageCount: 9,
-          createdAt: new Date('2024-01-18'),
-          projectId: 2
-        },
-        {
-          id: 5,
-          name: '现代建筑',
-          categoryId: 3,
-          color: '#45b7d1',
-          description: '现代风格建筑',
-          usageCount: 0,
-          createdAt: new Date('2024-01-19'),
-          projectId: 3
-        }
-      ]
+const globalTags = computed(() => {
+  return tags.value.filter(tag => tag.is_global)
+})
+
+const selectAllGlobalTags = computed({
+  get: () => {
+    return copyForm.tag_ids.length === globalTags.value.length && globalTags.value.length > 0
+  },
+  set: (val: boolean) => {
+    if (val) {
+      copyForm.tag_ids = globalTags.value.map(tag => tag.id)
+    } else {
+      copyForm.tag_ids = []
+    }
+  }
+})
+
+const isGlobalTagsIndeterminate = computed(() => {
+  return copyForm.tag_ids.length > 0 && copyForm.tag_ids.length < globalTags.value.length
+})
+
+const loadProjects = async () => {
+  try {
+    const response = await projectApi.getProjects()
+    if (response?.data) {
+      projects.value = response.data
+    }
+  } catch (error) {
+    ElMessage.error('加载项目列表失败')
+    console.error('Load projects error:', error)
+  }
+}
+
+const loadTags = async () => {
+  try {
+    const params: any = {}
+    
+    if (selectedTagType.value !== 'all') {
+      params.tag_type = selectedTagType.value
+    }
+    
+    if (selectedProject.value && selectedTagType.value === 'project') {
+      params.project_id = selectedProject.value
+    }
+    
+    const response = await tagApi.getTags(params)
+    if (response?.data) {
+      tags.value = response.data
       filterTags()
-    }
-
-    const filterTags = () => {
-      let filtered = [...tags.value]
-      
-      if (selectedProject.value) {
-        filtered = filtered.filter(tag => tag.projectId === parseInt(selectedProject.value))
-      }
-      
-      if (selectedCategory.value) {
-        filtered = filtered.filter(tag => tag.categoryId === parseInt(selectedCategory.value))
-      }
-      
-      if (searchQuery.value) {
-        const query = searchQuery.value.toLowerCase()
-        filtered = filtered.filter(tag => 
-          tag.name.toLowerCase().includes(query) ||
-          (tag.description && tag.description.toLowerCase().includes(query))
-        )
-      }
-      
-      filteredTags.value = filtered
-    }
-
-    const sortTags = () => {
-      // sortedTags computed 会自动处理排序
-    }
-
-    const toggleSortOrder = () => {
-      sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-    }
-
-    const selectTag = (tag) => {
-      selectedTag.value = tag
-      showTagDetails.value = true
-      loadTagImages(tag.id)
-    }
-
-    const loadTagImages = async (tagId) => {
-      // 模拟关联图片
-      tagImages.value = [
-        {
-          id: 1,
-          name: 'sample1.jpg',
-          thumbnail: '/api/images/thumbnails/sample1.jpg'
-        },
-        {
-          id: 2,
-          name: 'sample2.jpg',
-          thumbnail: '/api/images/thumbnails/sample2.jpg'
-        }
-      ]
-    }
-
-    const getCategoryName = (categoryId) => {
-      const category = categories.value.find(c => c.id === categoryId)
-      return category ? category.name : '未分类'
-    }
-
-    const editTag = (tag) => {
-      tagForm.id = tag.id
-      tagForm.name = tag.name
-      tagForm.categoryId = tag.categoryId
-      tagForm.color = tag.color
-      tagForm.description = tag.description
-      showEditDialog.value = true
-    }
-
-    const deleteTag = async (tag) => {
-      try {
-        await ElMessageBox.confirm(
-          `确定要删除标签 "${tag.name}" 吗？`,
-          '删除确认',
-          {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            type: 'warning'
-          }
-        )
-        
-        console.log('删除标签:', tag)
-        ElMessage.success('标签删除成功')
-        await loadTags()
-      } catch {
-        ElMessage.info('已取消删除')
-      }
-    }
-
-    const resetTagForm = () => {
-      tagForm.id = null
-      tagForm.name = ''
-      tagForm.categoryId = ''
-      tagForm.color = '#409EFF'
-      tagForm.description = ''
-    }
-
-    const closeDialogs = () => {
-      showCreateDialog.value = false
-      showEditDialog.value = false
-      resetTagForm()
-    }
-
-    const saveTag = async () => {
-      try {
-        await tagFormRef.value.validate()
-        
-        if (showEditDialog.value) {
-          console.log('更新标签:', tagForm)
-          ElMessage.success('标签更新成功')
-        } else {
-          console.log('创建标签:', tagForm)
-          ElMessage.success('标签创建成功')
-        }
-        
-        await loadTags()
-        closeDialogs()
-      } catch (error) {
-        if (error !== false) { // 排除表单验证失败的情况
-          ElMessage.error('保存失败')
-        }
-      }
-    }
-
-    const formatDate = (date) => {
-      return new Date(date).toLocaleDateString('zh-CN')
-    }
-
-    onMounted(() => {
-      loadProjects()
       loadCategories()
-      loadTags()
-    })
+    }
+  } catch (error) {
+    ElMessage.error('加载标签列表失败')
+    console.error('Load tags error:', error)
+  }
+}
 
-    return {
-      tags,
-      filteredTags,
-      selectedTag,
-      selectedProject,
-      selectedCategory,
-      searchQuery,
-      sortBy,
-      sortOrder,
-      viewMode,
-      showCreateDialog,
-      showEditDialog,
-      showTagDetails,
-      showDialog,
-      projects,
-      categories,
-      tagImages,
-      tagForm,
-      tagFormRef,
-      tagFormRules,
-      presetColors,
-      usedTagsCount,
-      unusedTagsCount,
-      usageRate,
-      sortedTags,
-      filterTags,
-      sortTags,
-      toggleSortOrder,
-      selectTag,
-      getCategoryName,
-      editTag,
-      deleteTag,
-      closeDialogs,
-      saveTag,
-      formatDate,
-      loadTags,
-      // Element Plus 图标
-      Plus,
-      Search,
-      Grid,
-      List,
-      Edit,
-      Delete,
-      SortUp,
-      SortDown
+const loadCategories = () => {
+  const categorySet = new Set<string>()
+  tags.value.forEach(tag => {
+    if (tag.category) {
+      categorySet.add(tag.category)
+    }
+  })
+  categories.value = Array.from(categorySet)
+}
+
+const filterTags = () => {
+  let filtered = [...tags.value]
+  
+  if (selectedCategory.value) {
+    filtered = filtered.filter(tag => tag.category === selectedCategory.value)
+  }
+  
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(tag => 
+      tag.name.toLowerCase().includes(query) ||
+      tag.category.toLowerCase().includes(query)
+    )
+  }
+  
+  filteredTags.value = filtered
+}
+
+const sortTags = () => {
+  // sortedTags computed 会自动处理排序
+}
+
+const toggleSortOrder = () => {
+  sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+}
+
+const selectTag = (tag: Tag) => {
+  selectedTag.value = tag
+  showTagDetails.value = true
+  loadTagImages(tag.id)
+}
+
+const loadTagImages = async (tagId: number) => {
+  // 模拟关联图片数据
+  tagImages.value = []
+}
+
+const editTag = (tag: Tag) => {
+  tagForm.id = tag.id
+  tagForm.name = tag.name
+  tagForm.category = tag.category
+  tagForm.color = tag.color
+  tagForm.tag_type = tag.tag_type
+  tagForm.project_id = tag.project_id
+  showEditDialog.value = true
+}
+
+const deleteTag = async (tag: Tag) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除标签 "${tag.name}" 吗？`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const response = await tagApi.deleteTag(tag.id)
+    if (response?.code === 200) {
+      ElMessage.success('标签删除成功')
+      await loadTags()
+    } else {
+      ElMessage.error(response?.message || '标签删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('标签删除失败')
+      console.error('Delete tag error:', error)
     }
   }
 }
+
+const resetTagForm = () => {
+  tagForm.id = null
+  tagForm.name = ''
+  tagForm.category = ''
+  tagForm.color = '#409EFF'
+  tagForm.tag_type = 'global'
+  tagForm.project_id = null
+}
+
+const closeDialogs = () => {
+  showCreateDialog.value = false
+  showEditDialog.value = false
+  resetTagForm()
+}
+
+const saveTag = async () => {
+  try {
+    await tagFormRef.value.validate()
+    
+    saving.value = true
+    
+    const tagData = {
+      name: tagForm.name,
+      category: tagForm.category,
+      color: tagForm.color,
+      project_id: tagForm.tag_type === 'global' ? null : tagForm.project_id
+    }
+    
+    let response
+    if (showEditDialog.value && tagForm.id) {
+      response = await tagApi.updateTag(tagForm.id, tagData)
+    } else {
+      response = await tagApi.createTag(tagData)
+    }
+    
+    if (response?.code === 200) {
+      ElMessage.success(showEditDialog.value ? '标签更新成功' : '标签创建成功')
+      await loadTags()
+      closeDialogs()
+    } else {
+      ElMessage.error(response?.message || '保存失败')
+    }
+  } catch (error) {
+    if (error !== false) {
+      ElMessage.error('保存失败')
+      console.error('Save tag error:', error)
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
+const handleSelectAllGlobalTags = (checked: boolean) => {
+  if (checked) {
+    copyForm.tag_ids = globalTags.value.map(tag => tag.id)
+  } else {
+    copyForm.tag_ids = []
+  }
+}
+
+const copyTagsToProject = async () => {
+  if (!copyForm.project_id || !copyForm.tag_ids.length) {
+    ElMessage.warning('请选择项目和标签')
+    return
+  }
+  
+  copying.value = true
+  try {
+    const response = await tagApi.copyGlobalTagsToProject(copyForm.project_id, copyForm.tag_ids)
+    if (response?.code === 200) {
+      ElMessage.success(`成功复制 ${copyForm.tag_ids.length} 个标签到项目`)
+      showCopyDialog.value = false
+      copyForm.project_id = null
+      copyForm.tag_ids = []
+      await loadTags()
+    } else {
+      ElMessage.error(response?.message || '复制失败')
+    }
+  } catch (error) {
+    ElMessage.error('复制标签失败')
+    console.error('Copy tags error:', error)
+  } finally {
+    copying.value = false
+  }
+}
+
+const formatDate = (date: string) => {
+  return new Date(date).toLocaleDateString('zh-CN')
+}
+
+// 监听标签类型变化
+watch(() => selectedTagType.value, () => {
+  if (selectedTagType.value === 'global') {
+    selectedProject.value = ''
+  }
+  loadTags()
+})
+
+onMounted(() => {
+  loadProjects()
+  loadTags()
+})
 </script>
 
 <style scoped>
@@ -598,8 +790,22 @@ export default {
   margin: 0 auto;
 }
 
+.tag-management-header {
+  margin-bottom: 24px;
+}
+
 .filter-card {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.quick-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.batch-actions {
+  text-align: right;
 }
 
 .statistics-row {
@@ -620,7 +826,7 @@ export default {
 
 .tag-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 16px;
 }
 
@@ -648,10 +854,28 @@ export default {
   padding: 16px;
 }
 
-.tag-info h3 {
-  margin: 0 0 8px 0;
+.tag-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.tag-header h3 {
+  margin: 0;
   font-size: 16px;
   color: var(--el-text-color-primary);
+  flex: 1;
+  margin-right: 8px;
+}
+
+.tag-type {
+  flex-shrink: 0;
+}
+
+.project-info {
+  margin-top: 8px;
+  margin-bottom: 12px;
 }
 
 .tag-stats {
@@ -685,6 +909,16 @@ export default {
   height: 20px;
   border-radius: 50%;
   border: 1px solid var(--el-border-color);
+}
+
+.global-indicator {
+  color: var(--el-text-color-placeholder);
+  font-style: italic;
+}
+
+.unknown-project {
+  color: var(--el-color-danger);
+  font-size: 12px;
 }
 
 .tag-details-content {
@@ -737,5 +971,110 @@ export default {
 
 .preset-color:hover {
   border-color: var(--el-border-color-darker);
+}
+
+.form-help-text {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-top: 4px;
+}
+
+.copy-dialog-content {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.tag-selection {
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.selection-header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  margin-bottom: 12px;
+}
+
+.tag-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.tag-checkbox-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--el-border-color-extra-light);
+}
+
+.tag-checkbox-item:last-child {
+  border-bottom: none;
+}
+
+.tag-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tag-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--el-border-color);
+}
+
+.tag-name {
+  font-weight: 500;
+  margin-right: 8px;
+}
+
+.project-statistics {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  flex: 1;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-card h3 {
+  margin: 0 0 10px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: bold;
+  color: #007bff;
+}
+
+@media (max-width: 768px) {
+  .tag-management {
+    padding: 16px;
+  }
+  
+  .tag-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-card .el-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .filter-card .el-col {
+    width: 100%;
+  }
+  
+  .batch-actions {
+    text-align: center;
+    margin-top: 12px;
+  }
 }
 </style>
