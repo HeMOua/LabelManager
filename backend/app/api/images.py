@@ -1,11 +1,13 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 import os
 import json
 
 from app.core.database import get_db
 from app.core.config import settings
+from app.schemas.base import ApiResponseList
 from app.services.persistence.image_service import ImageService
 from app.services.storage.storage_service import get_storage_service
 from app.schemas import ImageWithTags, ApiResponse
@@ -63,7 +65,7 @@ async def upload_image(
         return ApiResponse.error(message=f"图片上传失败: {str(e)}")
 
 
-@router.get("/project/{project_id}", response_model=ApiResponse[List[ImageWithTags]])
+@router.get("/project/{project_id}", response_model=ApiResponseList[ImageWithTags])
 def get_project_images(
         project_id: int,
         skip: int = 0,
@@ -73,6 +75,7 @@ def get_project_images(
     """获取项目的图片列表"""
     try:
         image_service = ImageService(db)
+        total = db.query(Image).filter(Image.project_id == project_id).count()
         images = db.query(Image).filter(Image.project_id == project_id).offset(skip).limit(limit).all()
 
         result = []
@@ -81,7 +84,7 @@ def get_project_images(
             if image_with_tags:
                 result.append(image_with_tags)
 
-        return ApiResponse.success(data=result, message="获取项目图片列表成功")
+        return ApiResponseList.success(data=result, total=total, message="获取项目图片列表成功")
     except Exception as e:
         return ApiResponse.error(message=f"获取项目图片列表失败: {str(e)}")
 

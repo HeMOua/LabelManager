@@ -18,5 +18,6 @@
   padding: 24px;
   background: #f0f2f5;
   overflow-y: auto;
+  position: relative;
 }
 </style>

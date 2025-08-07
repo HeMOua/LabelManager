@@ -29,3 +29,14 @@ class ApiResponse(CamelCaseModel, Generic[T]):
     def bad_request(cls, message: str = "请求参数错误") -> "ApiResponse[None]":
         """400响应"""
         return cls(code=400, message=message, data=None)
+
+
+class ApiResponseList(ApiResponse, Generic[T]):
+    """用于返回列表数据的API响应格式"""
+    data: Optional[list[T]] = None
+    total: int = 0
+
+    @classmethod
+    def success(cls, data: list[T] = None, total: int = 0, message: str = "操作成功") -> "ApiResponseList[T]":
+        """成功响应，包含列表数据"""
+        return cls(code=200, message=message, data=data, total=total)

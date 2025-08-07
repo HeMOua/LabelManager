@@ -160,7 +160,7 @@
 
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-container">
-      <el-skeleton :rows="3" animated />
+      <el-skeleton :rows="8" animated />
     </div>
 
     <!-- 网格视图 -->
@@ -271,6 +271,7 @@
       <el-table 
         :data="filteredImages" 
         stripe
+        :height="batchMode ? 'calc(100vh - 400px)' : 'calc(100vh - 320px)'"
         @row-click="handleRowClick"
         :row-class-name="getRowClassName"
       >
@@ -389,7 +390,7 @@
     </el-empty>
 
     <!-- 分页 -->
-    <div class="pagination-container" v-if="total > pageSize">
+    <div class="pagination-container" v-show="!loading && selectedProject">
       <el-pagination
         v-model:current-page="currentPage"
         v-model:page-size="pageSize"
@@ -414,7 +415,7 @@
           :src="getImageFullUrl(previewImageData)"
           :alt="previewImageData.filename || '图片'"
           fit="contain"
-          style="width: 100%; max-height: 70vh;"
+          style="width: 100%; max-height: 85vh;"
         >
           <template #error>
             <div class="preview-error">
@@ -786,8 +787,6 @@ const clearAllFiles = () => {
   
   // 清理上传组件
   uploadRef.value?.clearFiles()
-  
-  ElMessage.success('已清空所有文件')
 }
 
 // 视图模式持久化
@@ -1058,8 +1057,7 @@ const loadImageThumbnail = async (image: Image, cacheKey: string) => {
     } else {
       throw new Error('No URL in response')
     }
-  } catch (error) {
-    console.error(`Failed to load thumbnail for image ${image.id}:`, error)
+  } catch {
     cache.thumbnailError = true
   } finally {
     cache.thumbnailLoading = false
@@ -1877,8 +1875,11 @@ onUnmounted(() => {
 }
 
 /* 预览对话框 */
-.image-preview-dialog {
+:deep(.image-preview-dialog) {
   border-radius: 12px;
+  top: 50% !important;
+  transform: translateY(-50%);
+  margin: auto;
 }
 
 .preview-container {
