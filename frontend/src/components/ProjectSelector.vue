@@ -14,13 +14,14 @@
   </el-select>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useAppStore } from '../stores/app'
-import { projectApi } from '../utils/api'
+import { useAppStore } from '@/stores/app'
+import { projectApi } from '@/api/project'
+import type { Project } from '@/types'
 
 const appStore = useAppStore()
-const projects = ref([])
+const projects = ref<Project[]>([])
 
 const selectedProject = computed({
   get: () => appStore.currentProject?.id,
@@ -32,7 +33,7 @@ const selectedProject = computed({
   }
 })
 
-const handleProjectChange = (projectId) => {
+const handleProjectChange = (projectId: number) => {
   selectedProject.value = projectId
 }
 

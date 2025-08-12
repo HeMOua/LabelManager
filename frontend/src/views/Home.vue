@@ -42,25 +42,25 @@
         <h3>快速操作</h3>
         <el-row :gutter="20">
           <el-col :span="6">
-            <el-button type="primary" @click="$router.push('/gallery')">
+            <el-button type="primary" @click="handleRouteChange('/gallery')">
               <el-icon><Picture /></el-icon>
               图片库
             </el-button>
           </el-col>
           <el-col :span="6">
-            <el-button type="success" @click="$router.push('/tree')">
+            <el-button type="success" @click="handleRouteChange('/tree')">
               <el-icon><Operation /></el-icon>
               树形浏览
             </el-button>
           </el-col>
           <el-col :span="6">
-            <el-button type="warning" @click="$router.push('/tags')">
+            <el-button type="warning" @click="handleRouteChange('/tags')">
               <el-icon><Collection /></el-icon>
               标签管理
             </el-button>
           </el-col>
           <el-col :span="6">
-            <el-button type="info" @click="$router.push('/projects')">
+            <el-button type="info" @click="handleRouteChange('/projects')">
               <el-icon><Folder /></el-icon>
               项目管理
             </el-button>
@@ -71,12 +71,24 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { addTabFromMenu } from '@/utils/menuList';
+import { defineComponent } from 'vue'
+import { useRouter } from 'vue-router'
+const router = useRouter()
+
+defineComponent({
+  name: 'HomeView'
+})
+
+const handleRouteChange = (path: string) => {
+  addTabFromMenu(path)
+  router.push(path)
+}
 </script>
 
 <style scoped>
 .home {
-  max-width: 1200px;
   margin: 0 auto;
 }
 

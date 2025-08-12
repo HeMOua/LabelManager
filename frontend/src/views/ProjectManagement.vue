@@ -8,17 +8,17 @@
     <div class="project-filters">
       <div class="filter-group">
         <label>状态筛选:</label>
-        <select v-model="selectedStatus" @change="filterProjects">
-          <option value="">所有状态</option>
-          <option value="active">进行中</option>
-          <option value="completed">已完成</option>
-          <option value="paused">已暂停</option>
-        </select>
+        <el-select v-model="selectedStatus" @change="filterProjects" style="width: 120px;" placeholder="所有状态">
+          <el-option label="所有状态" value=""></el-option>
+          <el-option label="进行中" value="active"></el-option>
+          <el-option label="已完成" value="completed"></el-option>
+          <el-option label="已暂停" value="paused"></el-option>
+        </el-select>
       </div>
       
       <div class="filter-group">
         <label>搜索:</label>
-        <input 
+        <el-input 
           v-model="searchQuery" 
           @input="filterProjects"
           type="text" 
@@ -51,12 +51,12 @@
       <div class="list-header">
         <div class="sort-controls">
           <label>排序:</label>
-          <select v-model="sortBy" @change="sortProjects">
-            <option value="name">名称</option>
-            <option value="createdAt">创建时间</option>
-            <option value="updatedAt">更新时间</option>
-            <option value="imageCount">图片数量</option>
-          </select>
+          <el-select v-model="sortBy" style="width: 150px;">
+            <el-option label="名称" value="name"></el-option>
+            <el-option label="创建时间" value="createdAt"></el-option>
+            <el-option label="更新时间" value="updatedAt"></el-option>
+            <el-option label="图片数量" value="imageCount"></el-option>
+          </el-select>
           <button @click="toggleSortOrder" class="sort-toggle">
             {{ sortOrder === 'asc' ? '↑' : '↓' }}
           </button>
@@ -184,32 +184,28 @@
     </div>
 
     <!-- 项目详情侧边栏 -->
-    <div v-if="selectedProject" class="project-details-sidebar">
-      <div class="sidebar-header">
-        <h2>{{ selectedProject.name }}</h2>
-        <button @click="selectedProject = null" class="close-sidebar">×</button>
-      </div>
+    <el-drawer v-model="drawerVisible" class="project-details-sidebar" :title="selectedProject?.name" header-class="sidebar-title">
       
       <div class="sidebar-content">
         <div class="detail-section">
           <h3>基本信息</h3>
           <div class="detail-item">
             <label>状态:</label>
-            <span class="status-badge" :class="selectedProject.status">
-              {{ getStatusText(selectedProject.status) }}
+            <span class="status-badge" :class="selectedProject?.status">
+              {{ getStatusText(selectedProject?.status) }}
             </span>
           </div>
           <div class="detail-item">
             <label>描述:</label>
-            <p>{{ selectedProject.description || '无描述' }}</p>
+            <p>{{ selectedProject?.description || '无描述' }}</p>
           </div>
           <div class="detail-item">
             <label>创建时间:</label>
-            <span>{{ formatDate(selectedProject.createdAt) }}</span>
+            <span>{{ formatDate(selectedProject?.createdAt) }}</span>
           </div>
           <div class="detail-item">
             <label>最后更新:</label>
-            <span>{{ formatDate(selectedProject.updatedAt) }}</span>
+            <span>{{ formatDate(selectedProject?.updatedAt) }}</span>
           </div>
         </div>
 
@@ -217,19 +213,19 @@
           <h3>数据统计</h3>
           <div class="stats-grid">
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject.imageCount }}</div>
+              <div class="stats-number">{{ selectedProject?.imageCount }}</div>
               <div class="stats-label">总图片</div>
             </div>
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject.tagCount }}</div>
+              <div class="stats-number">{{ selectedProject?.tagCount }}</div>
               <div class="stats-label">标签数</div>
             </div>
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject.labeledImages }}</div>
+              <div class="stats-number">{{ selectedProject?.labeledImages }}</div>
               <div class="stats-label">已标注</div>
             </div>
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject.labelProgress }}%</div>
+              <div class="stats-number">{{ selectedProject?.labelProgress }}%</div>
               <div class="stats-label">完成度</div>
             </div>
           </div>
@@ -282,7 +278,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </el-drawer>
 
     <!-- 创建/编辑对话框 -->
     <div v-if="showCreateDialog || showEditDialog" class="dialog-overlay" @click="closeDialogs">
@@ -291,367 +287,267 @@
           <h3>{{ showCreateDialog ? '创建' : '编辑' }}项目</h3>
           <button @click="closeDialogs" class="close-btn">×</button>
         </div>
-        
-        <form @submit.prevent="saveProject" class="dialog-form">
-          <div class="form-group">
-            <label>项目名称:</label>
-            <input v-model="projectForm.name" type="text" required />
-          </div>
+
+        <el-form :model="projectForm" class="dialog-form" :rules="rules" ref="projectFormRef" label-width="100px">
+          <el-form-item label="项目名称" prop="name">
+            <el-input v-model="projectForm.name" placeholder="请输入项目名称" />
+          </el-form-item>
+
+          <el-form-item label="项目状态">
+            <el-select v-model="projectForm.status" placeholder="请选择项目状态">
+              <el-option label="进行中" value="active" />
+              <el-option label="已完成" value="completed" />
+              <el-option label="已暂停" value="paused" />
+            </el-select>
+          </el-form-item>
           
-          <div class="form-group">
-            <label>项目状态:</label>
-            <select v-model="projectForm.status" required>
-              <option value="active">进行中</option>
-              <option value="completed">已完成</option>
-              <option value="paused">已暂停</option>
-            </select>
-          </div>
+          <el-form-item label="项目描述">
+            <el-input v-model="projectForm.description" type="textarea" placeholder="请输入项目描述" />
+          </el-form-item>
           
-          <div class="form-group">
-            <label>项目描述:</label>
-            <textarea v-model="projectForm.description" rows="4" placeholder="请输入项目描述..."></textarea>
-          </div>
+          <el-form-item class="dialog-actions">
+            <el-button @click="closeDialogs" class="cancel-btn">取消</el-button>
+            <el-button @click="saveProject" class="save-btn">保存</el-button>
+          </el-form-item>
           
-          <div class="form-group">
-            <label>预设标签:</label>
-            <div class="preset-tags">
-              <div 
-                v-for="tag in availableTags" 
-                :key="tag.id"
-                class="preset-tag"
-                @click="togglePresetTag(tag)"
-                :class="{ selected: projectForm.presetTags.includes(tag.id) }"
-              >
-                <div class="tag-color" :style="{ backgroundColor: tag.color }"></div>
-                <span>{{ tag.name }}</span>
-              </div>
-            </div>
-          </div>
-          
-          <div class="dialog-actions">
-            <button type="button" @click="closeDialogs" class="cancel-btn">取消</button>
-            <button type="submit" class="save-btn">保存</button>
-          </div>
-        </form>
+        </el-form>
       </div>
     </div>
   </div>
 </template>
 
-<script>
-import { ref, reactive, computed, onMounted } from 'vue'
+<script setup lang="ts">
+import type { Project, Tag } from '@/types/index'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { projectApi } from '@/api/project'
+import type { FormRules } from 'element-plus'
+import { showConfirm } from '@/utils/messageBox'
+import { addTabFromMenu } from '@/utils/menuList'
 
-export default {
-  name: 'ProjectManagement',
-  setup() {
-    const router = useRouter()
+const router = useRouter()
+
+const projects = ref<Project[]>([])
+const filteredProjects = ref<Project[]>([])
+const selectedProject = ref<Project | null>(null)
+const selectedStatus = ref('')
+const searchQuery = ref('')
+const sortBy = ref<'name' | 'createdAt' | 'updatedAt' | 'imageCount'>('updatedAt')
+const sortOrder = ref<'asc' | 'desc'>('desc')
+const viewMode = ref<'grid' | 'list'>('grid')
+const showCreateDialog = ref(false)
+const showEditDialog = ref(false)
+const projectTags = ref([])
+const recentImages = ref([])
+
+const projectForm = reactive({
+  id: 0,
+  name: '',
+  description: '',
+  status: 'active',
+})
+
+const drawerVisible = ref(false)
+watch(drawerVisible, (visible) => {
+  if (!visible) {
+    selectedProject.value = null
+  }
+})
+
+const rules = reactive<FormRules<typeof projectForm>>({
+  name: [
+    { required: true, message: '请输入项目名称', trigger: 'blur' },
+    { min: 2, max: 50, message: '项目名称长度在 2 到 50 个字符之间', trigger: 'blur' }
+  ],
+  status: [
+    { required: true, message: '请选择项目状态', trigger: 'change' }
+  ]
+})
+
+const activeProjectsCount = computed(() => {
+  return filteredProjects.value.filter(p => p.status === 'active').length
+})
+
+const completedProjectsCount = computed(() => {
+  return filteredProjects.value.filter(p => p.status === 'completed').length
+})
+
+const totalImagesCount = computed(() => {
+  return filteredProjects.value.reduce((total, p) => total + p.imageCount, 0)
+})
+
+const sortedProjects = computed(() => {
+  const sorted = [...filteredProjects.value].sort((a, b) => {
+    let aVal: any = a[sortBy.value]
+    let bVal: any = b[sortBy.value]
+
+    if (typeof aVal === 'string') {
+      aVal = aVal.toLowerCase()
+      bVal = bVal.toLowerCase()
+    } else if (typeof aVal === 'number') {
+      aVal = Number(aVal)
+      bVal = Number(bVal)
+    } else if (aVal instanceof Date) {
+      aVal = new Date(aVal).getTime()
+      bVal = new Date(bVal).getTime()
+    }
     
-    const projects = ref([])
-    const filteredProjects = ref([])
-    const selectedProject = ref(null)
-    const selectedStatus = ref('')
-    const searchQuery = ref('')
-    const sortBy = ref('updatedAt')
-    const sortOrder = ref('desc')
-    const viewMode = ref('grid')
-    const showCreateDialog = ref(false)
-    const showEditDialog = ref(false)
-    const availableTags = ref([])
-    const projectTags = ref([])
-    const recentImages = ref([])
-
-    const projectForm = reactive({
-      id: null,
-      name: '',
-      description: '',
-      status: 'active',
-      presetTags: []
-    })
-
-    const activeProjectsCount = computed(() => {
-      return filteredProjects.value.filter(p => p.status === 'active').length
-    })
-
-    const completedProjectsCount = computed(() => {
-      return filteredProjects.value.filter(p => p.status === 'completed').length
-    })
-
-    const totalImagesCount = computed(() => {
-      return filteredProjects.value.reduce((total, p) => total + p.imageCount, 0)
-    })
-
-    const sortedProjects = computed(() => {
-      const sorted = [...filteredProjects.value].sort((a, b) => {
-        let aVal = a[sortBy.value]
-        let bVal = b[sortBy.value]
-        
-        if (sortBy.value.includes('At')) {
-          aVal = new Date(aVal)
-          bVal = new Date(bVal)
-        }
-        
-        if (sortOrder.value === 'asc') {
-          return aVal > bVal ? 1 : -1
-        } else {
-          return aVal < bVal ? 1 : -1
-        }
-      })
-      return sorted
-    })
-
-    const loadProjects = async () => {
-      // 模拟项目数据
-      projects.value = [
-        {
-          id: 1,
-          name: '医疗影像标注项目',
-          description: '用于医疗诊断的X光片和CT图像标注',
-          status: 'active',
-          imageCount: 1250,
-          tagCount: 15,
-          labeledImages: 892,
-          labelProgress: 71,
-          createdAt: new Date('2024-01-15'),
-          updatedAt: new Date('2024-01-30')
-        },
-        {
-          id: 2,
-          name: '自动驾驶数据集',
-          description: '道路场景图像的物体检测和分割标注',
-          status: 'active',
-          imageCount: 3200,
-          tagCount: 25,
-          labeledImages: 2880,
-          labelProgress: 90,
-          createdAt: new Date('2024-01-10'),
-          updatedAt: new Date('2024-01-29')
-        },
-        {
-          id: 3,
-          name: '动物分类数据集',
-          description: '野生动物图像的种类分类标注',
-          status: 'completed',
-          imageCount: 800,
-          tagCount: 12,
-          labeledImages: 800,
-          labelProgress: 100,
-          createdAt: new Date('2023-12-01'),
-          updatedAt: new Date('2024-01-15')
-        },
-        {
-          id: 4,
-          name: '工业缺陷检测',
-          description: '工业产品表面缺陷的识别和标注',
-          status: 'paused',
-          imageCount: 500,
-          tagCount: 8,
-          labeledImages: 150,
-          labelProgress: 30,
-          createdAt: new Date('2024-01-20'),
-          updatedAt: new Date('2024-01-25')
-        }
-      ]
-      filterProjects()
+    if (sortOrder.value === 'asc') {
+      return aVal > bVal ? 1 : -1
+    } else {
+      return aVal < bVal ? 1 : -1
     }
+  })
+  return sorted
+})
 
-    const loadAvailableTags = async () => {
-      availableTags.value = [
-        { id: 1, name: '人物', color: '#ff6b6b' },
-        { id: 2, name: '动物', color: '#4ecdc4' },
-        { id: 3, name: '建筑', color: '#45b7d1' },
-        { id: 4, name: '车辆', color: '#feca57' },
-        { id: 5, name: '自然景观', color: '#96ceb4' },
-        { id: 6, name: '器械', color: '#a55eea' },
-        { id: 7, name: '食物', color: '#fd79a8' },
-        { id: 8, name: '文字', color: '#fdcb6e' }
-      ]
-    }
-
-    const filterProjects = () => {
-      let filtered = [...projects.value]
-      
-      if (selectedStatus.value) {
-        filtered = filtered.filter(p => p.status === selectedStatus.value)
-      }
-      
-      if (searchQuery.value) {
-        const query = searchQuery.value.toLowerCase()
-        filtered = filtered.filter(p => 
-          p.name.toLowerCase().includes(query) ||
-          (p.description && p.description.toLowerCase().includes(query))
-        )
-      }
-      
-      filteredProjects.value = filtered
-    }
-
-    const sortProjects = () => {
-      // sortedProjects computed 会自动处理排序
-    }
-
-    const toggleSortOrder = () => {
-      sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-    }
-
-    const selectProject = (project) => {
-      selectedProject.value = project
-      loadProjectDetails(project.id)
-    }
-
-    const loadProjectDetails = async (projectId) => {
-      // 模拟项目详情数据
-      projectTags.value = [
-        { id: 1, name: '正常', color: '#96ceb4', count: 450 },
-        { id: 2, name: '异常', color: '#ff6b6b', count: 125 },
-        { id: 3, name: '疑似', color: '#feca57', count: 75 }
-      ]
-      
-      recentImages.value = [
-        { id: 1, name: 'img_001.jpg', thumbnail: '/api/images/thumbnails/img_001.jpg' },
-        { id: 2, name: 'img_002.jpg', thumbnail: '/api/images/thumbnails/img_002.jpg' },
-        { id: 3, name: 'img_003.jpg', thumbnail: '/api/images/thumbnails/img_003.jpg' },
-        { id: 4, name: 'img_004.jpg', thumbnail: '/api/images/thumbnails/img_004.jpg' }
-      ]
-    }
-
-    const getStatusText = (status) => {
-      const statusMap = {
-        active: '进行中',
-        completed: '已完成',
-        paused: '已暂停'
-      }
-      return statusMap[status] || status
-    }
-
-    const editProject = (project) => {
-      projectForm.id = project.id
-      projectForm.name = project.name
-      projectForm.description = project.description
-      projectForm.status = project.status
-      projectForm.presetTags = []
-      showEditDialog.value = true
-    }
-
-    const duplicateProject = async (project) => {
-      if (confirm(`确定要复制项目 "${project.name}" 吗？`)) {
-        console.log('复制项目:', project)
-        // 实现复制逻辑
-        await loadProjects()
-      }
-    }
-
-    const deleteProject = async (project) => {
-      if (confirm(`确定要删除项目 "${project.name}" 吗？此操作不可恢复！`)) {
-        console.log('删除项目:', project)
-        // 实现删除逻辑
-        await loadProjects()
-      }
-    }
-
-    const resetProjectForm = () => {
-      projectForm.id = null
-      projectForm.name = ''
-      projectForm.description = ''
-      projectForm.status = 'active'
-      projectForm.presetTags = []
-    }
-
-    const closeDialogs = () => {
-      showCreateDialog.value = false
-      showEditDialog.value = false
-      resetProjectForm()
-    }
-
-    const togglePresetTag = (tag) => {
-      const index = projectForm.presetTags.indexOf(tag.id)
-      if (index > -1) {
-        projectForm.presetTags.splice(index, 1)
-      } else {
-        projectForm.presetTags.push(tag.id)
-      }
-    }
-
-    const saveProject = async () => {
-      try {
-        if (showEditDialog.value) {
-          console.log('更新项目:', projectForm)
-        } else {
-          console.log('创建项目:', projectForm)
-        }
-        
-        await loadProjects()
-        closeDialogs()
-      } catch (error) {
-        console.error('保存失败:', error)
-      }
-    }
-
-    const goToGallery = (project) => {
-      router.push({ name: 'ImageGallery', query: { project: project.id } })
-    }
-
-    const goToTags = (project) => {
-      router.push({ name: 'TagManagement', query: { project: project.id } })
-    }
-
-    const exportProject = (project) => {
-      console.log('导出项目数据:', project)
-      // 实现导出功能
-    }
-
-    const generateReport = (project) => {
-      console.log('生成项目报告:', project)
-      // 实现报告生成功能
-    }
-
-    const formatDate = (date) => {
-      return new Date(date).toLocaleDateString('zh-CN')
-    }
-
-    onMounted(() => {
-      loadProjects()
-      loadAvailableTags()
-    })
-
-    return {
-      projects,
-      filteredProjects,
-      selectedProject,
-      selectedStatus,
-      searchQuery,
-      sortBy,
-      sortOrder,
-      viewMode,
-      showCreateDialog,
-      showEditDialog,
-      availableTags,
-      projectTags,
-      recentImages,
-      projectForm,
-      activeProjectsCount,
-      completedProjectsCount,
-      totalImagesCount,
-      sortedProjects,
-      filterProjects,
-      sortProjects,
-      toggleSortOrder,
-      selectProject,
-      getStatusText,
-      editProject,
-      duplicateProject,
-      deleteProject,
-      closeDialogs,
-      togglePresetTag,
-      saveProject,
-      goToGallery,
-      goToTags,
-      exportProject,
-      generateReport,
-      formatDate
-    }
+const loadProjects = async () => {
+  try {
+    const response = await projectApi.getProjects()
+    projects.value = response.data
+    filterProjects()
+  } catch (error) {
+    console.error('加载项目失败:', error)
   }
 }
+
+const filterProjects = () => {
+  let filtered = [...projects.value]
+  
+  if (selectedStatus.value) {
+    filtered = filtered.filter(p => p.status === selectedStatus.value)
+  }
+  
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(p => 
+      p.name.toLowerCase().includes(query) ||
+      (p.description && p.description.toLowerCase().includes(query))
+    )
+  }
+  
+  filteredProjects.value = filtered
+}
+
+const toggleSortOrder = () => {
+  sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+}
+
+const selectProject = (project: Project) => {
+  drawerVisible.value = true
+  selectedProject.value = project
+  loadProjectDetails(project.id)
+}
+
+const loadProjectDetails = async (projectId: number) => {
+  // 模拟项目详情数据
+  projectTags.value = [
+    { id: 1, name: '正常', color: '#96ceb4', count: 450 },
+    { id: 2, name: '异常', color: '#ff6b6b', count: 125 },
+    { id: 3, name: '疑似', color: '#feca57', count: 75 }
+  ]
+  
+  recentImages.value = [
+    { id: 1, name: 'img_001.jpg', thumbnail: '/api/images/thumbnails/img_001.jpg' },
+    { id: 2, name: 'img_002.jpg', thumbnail: '/api/images/thumbnails/img_002.jpg' },
+    { id: 3, name: 'img_003.jpg', thumbnail: '/api/images/thumbnails/img_003.jpg' },
+    { id: 4, name: 'img_004.jpg', thumbnail: '/api/images/thumbnails/img_004.jpg' }
+  ]
+}
+
+const getStatusText = (status: Project['status']) => {
+  const statusMap = {
+    active: '进行中',
+    completed: '已完成',
+    paused: '已暂停'
+  }
+  return statusMap[status] || status
+}
+
+const editProject = (project: Project) => {
+  projectForm.id = project.id
+  projectForm.name = project.name
+  projectForm.description = project.description
+  projectForm.status = project.status
+  projectForm.presetTags = []
+  showEditDialog.value = true
+}
+
+const duplicateProject = async (project: Project) => {
+  try {
+    await showConfirm(`确定要复制项目 \"${project.name}\" 吗？`, '提示')
+    console.log('复制项目:', project)
+    // 实现复制逻辑
+    await loadProjects()
+  } catch {
+    // 用户取消，无需处理
+  }
+}
+
+const deleteProject = async (project: Project) => {
+  try {
+    await showConfirm(`确定要删除项目 \"${project.name}\" 吗？此操作不可恢复！`, '警告')
+    projectApi.deleteProject(project.id)
+    await loadProjects()
+  } catch {}
+}
+
+const resetProjectForm = () => {
+  projectForm.id = null
+  projectForm.name = ''
+  projectForm.description = ''
+  projectForm.status = 'active'
+  projectForm.presetTags = []
+}
+
+const closeDialogs = () => {
+  showCreateDialog.value = false
+  showEditDialog.value = false
+  resetProjectForm()
+}
+
+const saveProject = async () => {
+  try {
+    if (showEditDialog.value) {
+      await projectApi.updateProject(projectForm.id, projectForm)
+    } else {
+      await projectApi.createProject(projectForm)
+    }
+    
+    await loadProjects()
+    closeDialogs()
+  } catch (error) {
+    console.error('保存失败:', error)
+  }
+}
+
+const goToGallery = (project: Project) => {
+  addTabFromMenu('/gallery')
+  router.push({ path: '/gallery', query: { project: project.id } })
+}
+
+const goToTags = (project: Project) => {
+  addTabFromMenu('/tags')
+  router.push({ path: '/tags', query: { project: project.id } })
+}
+
+const exportProject = (project: Project) => {
+  console.log('导出项目数据:', project)
+  // 实现导出功能
+}
+
+const generateReport = (project: Project) => {
+  console.log('生成项目报告:', project)
+  // 实现报告生成功能
+}
+
+const formatDate = (date: string) => {
+  return new Date(date).toLocaleDateString('zh-CN')
+}
+
+onMounted(() => {
+  loadProjects()
+})
 </script>
 
 <style scoped>
@@ -709,14 +605,6 @@ export default {
   white-space: nowrap;
 }
 
-.filter-group select,
-.search-input {
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  min-width: 200px;
-}
-
 .project-statistics {
   display: flex;
   gap: 20px;
@@ -763,12 +651,7 @@ export default {
 .sort-controls label {
   font-weight: bold;
   color: #666;
-}
-
-.sort-controls select {
-  padding: 6px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  white-space: nowrap;
 }
 
 .sort-toggle {
@@ -1029,42 +912,9 @@ export default {
   color: white;
 }
 
-.project-details-sidebar {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 450px;
-  height: 100vh;
-  background-color: white;
-  border-left: 1px solid #e0e0e0;
-  z-index: 1000;
-  overflow-y: auto;
-}
-
-.sidebar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid #e0e0e0;
-  background-color: #f8f9fa;
-}
-
-.sidebar-header h2 {
-  margin: 0;
-  color: #333;
-}
-
-.close-sidebar {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-}
-
-.sidebar-content {
-  padding: 20px;
+::v-deep(.sidebar-title) > span {
+  font-size: 1.5rem;
+  font-weight: bold;
 }
 
 .detail-section {
@@ -1259,72 +1109,16 @@ export default {
   padding: 20px;
 }
 
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
-  color: #333;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.preset-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  max-height: 150px;
-  overflow-y: auto;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: #f8f9fa;
-}
-
-.preset-tag {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 10px;
-  border: 1px solid #ddd;
-  border-radius: 15px;
-  cursor: pointer;
-  background-color: white;
-  transition: all 0.3s;
-}
-
-.preset-tag:hover {
-  background-color: #e9ecef;
-}
-
-.preset-tag.selected {
-  background-color: #007bff;
-  color: white;
-  border-color: #007bff;
-}
-
-.preset-tag .tag-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 30px;
+}
+
+::v-deep(.el-form-item__content) {
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .cancel-btn, .save-btn {

@@ -136,9 +136,9 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import TreeNode from '../components/TreeNode.vue'
+import TreeNode from '@/components/TreeNode.vue'
 
 export default {
   name: 'TreeView',

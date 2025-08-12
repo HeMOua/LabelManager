@@ -72,7 +72,7 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { computed, ref, watch } from 'vue'
 
 export default {
