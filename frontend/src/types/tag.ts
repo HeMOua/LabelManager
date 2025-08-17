@@ -7,6 +7,11 @@ export interface Tag {
   updatedAt?: string
 }
 
+export interface TagSearch extends Tag {
+  tagType?: string
+  projectId?: number
+}
+
 export interface TagCreate {
   name: string
   color?: string

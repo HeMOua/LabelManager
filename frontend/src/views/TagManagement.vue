@@ -15,7 +15,7 @@
     <el-card class="filter-card" shadow="never">
       <el-row :gutter="16">
         <el-col :span="6">
-          <el-select v-model="selectedTagType" @change="loadTags" placeholder="标签类型">
+          <el-select v-model="selectedTagType" placeholder="标签类型">
             <el-option label="全部标签" value="all" />
             <el-option label="全局标签" value="global" />
             <el-option label="项目标签" value="project" />
@@ -119,10 +119,10 @@
         <div class="card-header">
           <span>标签列表</span>
           <div class="sort-controls">
-            <el-select v-model="sortBy" @change="sortTags" style="width: 120px;">
+            <el-select v-model="sortBy" style="width: 120px;">
               <el-option label="名称" value="name" />
-              <el-option label="使用次数" value="image_count" />
-              <el-option label="创建时间" value="created_at" />
+              <el-option label="使用次数" value="imageCount" />
+              <el-option label="创建时间" value="createdAt" />
             </el-select>
             <el-button
               @click="toggleSortOrder"
@@ -147,16 +147,16 @@
             <div class="tag-header">
               <h3>{{ tag.name }}</h3>
               <el-tag 
-                :type="tag.is_global ? 'success' : 'info'" 
+                :type="tag.isGlobal ? 'success' : 'info'" 
                 size="small"
                 class="tag-type"
               >
-                {{ tag.is_global ? '全局' : '项目' }}
+                {{ tag.isGlobal ? '全局' : '项目' }}
               </el-tag>
             </div>
             <el-tag size="small" type="warning">{{ tag.category }}</el-tag>
-            <div class="project-info" v-if="!tag.is_global && tag.project_name">
-              <el-tag size="small" type="primary">{{ tag.project_name }}</el-tag>
+            <div class="project-info" v-if="!tag.isGlobal && tag.projectName">
+              <el-tag size="small" type="primary">{{ tag.projectName }}</el-tag>
             </div>
             <div class="tag-stats">
               <el-statistic 
@@ -164,7 +164,7 @@
                 :value="tag.image_count" 
                 :value-style="{ fontSize: '14px' }" 
               />
-              <span class="created-date">{{ formatDate(tag.created_at) }}</span>
+              <span class="created-date">{{ formatDate(tag.createdAt) }}</span>
             </div>
           </div>
           <div class="tag-actions">
@@ -184,8 +184,8 @@
           <el-table-column property="name" label="名称" />
           <el-table-column label="类型" width="80">
             <template #default="{ row }">
-              <el-tag :type="row.is_global ? 'success' : 'info'" size="small">
-                {{ row.is_global ? '全局' : '项目' }}
+              <el-tag :type="row.isGlobal ? 'success' : 'info'" size="small">
+                {{ row.isGlobal ? '全局' : '项目' }}
               </el-tag>
             </template>
           </el-table-column>
@@ -196,17 +196,17 @@
           </el-table-column>
           <el-table-column label="所属项目" width="120">
             <template #default="{ row }">
-              <el-tag v-if="!row.is_global && row.project_name" size="small" type="primary">
-                {{ row.project_name }}
+              <el-tag v-if="!row.isGlobal && row.projectName" size="small" type="primary">
+                {{ row.projectName }}
               </el-tag>
-              <span v-else-if="row.is_global" class="global-indicator">-</span>
+              <span v-else-if="row.isGlobal" class="global-indicator">-</span>
               <span v-else class="unknown-project">未知项目</span>
             </template>
           </el-table-column>
           <el-table-column property="image_count" label="使用次数" width="100" />
           <el-table-column label="创建时间" width="150">
             <template #default="{ row }">
-              {{ formatDate(row.created_at) }}
+              {{ formatDate(row.createdAt) }}
             </template>
           </el-table-column>
           <el-table-column label="操作" width="120">
@@ -232,21 +232,21 @@
             <div class="color-display" :style="{ backgroundColor: selectedTag.color }"></div>
           </el-descriptions-item>
           <el-descriptions-item label="类型">
-            <el-tag :type="selectedTag.is_global ? 'success' : 'info'">
-              {{ selectedTag.is_global ? '全局标签' : '项目标签' }}
+            <el-tag :type="selectedTag.isGlobal ? 'success' : 'info'">
+              {{ selectedTag.isGlobal ? '全局标签' : '项目标签' }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="分类">
             {{ selectedTag.category }}
           </el-descriptions-item>
-          <el-descriptions-item label="所属项目" v-if="!selectedTag.is_global">
-            {{ selectedTag.project_name || '未知项目' }}
+          <el-descriptions-item label="所属项目" v-if="!selectedTag.isGlobal">
+            {{ selectedTag.projectName || '未知项目' }}
           </el-descriptions-item>
           <el-descriptions-item label="使用次数">
-            {{ selectedTag.image_count }}
+            {{ selectedTag.imageCount }}
           </el-descriptions-item>
           <el-descriptions-item label="创建时间">
-            {{ formatDate(selectedTag.created_at) }}
+            {{ formatDate(selectedTag.createdAt) }}
           </el-descriptions-item>
         </el-descriptions>
 
@@ -273,12 +273,12 @@
     >
       <el-form ref="tagFormRef" :model="tagForm" :rules="tagFormRules" label-width="80px">
         <el-form-item label="标签类型" prop="tag_type">
-          <el-radio-group v-model="tagForm.tag_type" :disabled="showEditDialog">
+          <el-radio-group v-model="tagForm.tagType" :disabled="showEditDialog">
             <el-radio label="global">全局标签</el-radio>
             <el-radio label="project">项目标签</el-radio>
           </el-radio-group>
           <div class="form-help-text">
-            <span v-if="tagForm.tag_type === 'global'">全局标签可以在所有项目中使用</span>
+            <span v-if="tagForm.tagType === 'global'">全局标签可以在所有项目中使用</span>
             <span v-else>项目标签只能在指定项目中使用</span>
           </div>
         </el-form-item>
@@ -286,9 +286,9 @@
         <el-form-item 
           label="所属项目" 
           prop="project_id"
-          v-if="tagForm.tag_type === 'project'"
+          v-if="tagForm.tagType === 'project'"
         >
-          <el-select v-model="tagForm.project_id" placeholder="选择项目" style="width: 100%">
+          <el-select v-model="tagForm.projectId" placeholder="选择项目" style="width: 100%">
             <el-option
               v-for="project in projects"
               :key="project.id"
@@ -417,7 +417,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Plus, Search, Grid, List, Edit, Delete, 
-  SortUp, SortDown, CopyDocument
+  SortUp, SortDown
 } from '@element-plus/icons-vue'
 import { tagApi } from '@/api/tags'
 import { projectApi } from '@/api/project'
@@ -427,12 +427,12 @@ interface Tag {
   name: string
   category: string
   color: string
-  project_id: number | null
-  created_at: string
-  tag_type: 'global' | 'project'
-  is_global: boolean
-  image_count: number
-  project_name?: string
+  projectId: number | null
+  createdAt: string
+  tagType: 'global' | 'project'
+  isGlobal: boolean
+  imageCount: number
+  projectName?: string
 }
 
 interface Project {
@@ -466,13 +466,13 @@ const tagForm = reactive({
   name: '',
   category: '',
   color: '#409EFF',
-  tag_type: 'global' as 'global' | 'project',
-  project_id: null as number | null
+  tagType: 'global' as 'global' | 'project',
+  projectId: null as number | null
 })
 
 const copyForm = reactive({
-  project_id: null as number | null,
-  tag_ids: [] as number[]
+  projectId: null as number | null,
+  tagIds: [] as number[]
 })
 
 const tagFormRules = {
@@ -482,13 +482,13 @@ const tagFormRules = {
   category: [
     { required: true, message: '请输入分类', trigger: 'blur' }
   ],
-  tag_type: [
+  tagType: [
     { required: true, message: '请选择标签类型', trigger: 'change' }
   ],
-  project_id: [
+  projectId: [
     {
       validator: (rule: any, value: any, callback: any) => {
-        if (tagForm.tag_type === 'project' && !value) {
+        if (tagForm.tagType === 'project' && !value) {
           callback(new Error('请选择所属项目'))
         } else {
           callback()
@@ -508,15 +508,15 @@ const presetColors = [
 ]
 
 const globalTagsCount = computed(() => {
-  return filteredTags.value.filter(tag => tag.is_global).length
+  return filteredTags.value.filter(tag => tag.isGlobal).length
 })
 
 const projectTagsCount = computed(() => {
-  return filteredTags.value.filter(tag => !tag.is_global).length
+  return filteredTags.value.filter(tag => !tag.isGlobal).length
 })
 
 const usedTagsCount = computed(() => {
-  return filteredTags.value.filter(tag => tag.image_count > 0).length
+  return filteredTags.value.filter(tag => tag.imageCount > 0).length
 })
 
 const sortedTags = computed(() => {
@@ -539,24 +539,24 @@ const sortedTags = computed(() => {
 })
 
 const globalTags = computed(() => {
-  return tags.value.filter(tag => tag.is_global)
+  return tags.value.filter(tag => tag.isGlobal)
 })
 
 const selectAllGlobalTags = computed({
   get: () => {
-    return copyForm.tag_ids.length === globalTags.value.length && globalTags.value.length > 0
+    return copyForm.tagIds.length === globalTags.value.length && globalTags.value.length > 0
   },
   set: (val: boolean) => {
     if (val) {
-      copyForm.tag_ids = globalTags.value.map(tag => tag.id)
+      copyForm.tagIds = globalTags.value.map(tag => tag.id)
     } else {
-      copyForm.tag_ids = []
+      copyForm.tagIds = []
     }
   }
 })
 
 const isGlobalTagsIndeterminate = computed(() => {
-  return copyForm.tag_ids.length > 0 && copyForm.tag_ids.length < globalTags.value.length
+  return copyForm.tagIds.length > 0 && copyForm.tagIds.length < globalTags.value.length
 })
 
 const loadProjects = async () => {
@@ -576,11 +576,11 @@ const loadTags = async () => {
     const params: any = {}
     
     if (selectedTagType.value !== 'all') {
-      params.tag_type = selectedTagType.value
+      params.tagType = selectedTagType.value
     }
     
     if (selectedProject.value && selectedTagType.value === 'project') {
-      params.project_id = selectedProject.value
+      params.projectId = selectedProject.value
     }
     
     const response = await tagApi.getTags(params)
@@ -623,10 +623,6 @@ const filterTags = () => {
   filteredTags.value = filtered
 }
 
-const sortTags = () => {
-  // sortedTags computed 会自动处理排序
-}
-
 const toggleSortOrder = () => {
   sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
 }
@@ -647,8 +643,8 @@ const editTag = (tag: Tag) => {
   tagForm.name = tag.name
   tagForm.category = tag.category
   tagForm.color = tag.color
-  tagForm.tag_type = tag.tag_type
-  tagForm.project_id = tag.project_id
+  tagForm.tagType = tag.tagType
+  tagForm.projectId = tag.projectId
   showEditDialog.value = true
 }
 
@@ -684,8 +680,8 @@ const resetTagForm = () => {
   tagForm.name = ''
   tagForm.category = ''
   tagForm.color = '#409EFF'
-  tagForm.tag_type = 'global'
-  tagForm.project_id = null
+  tagForm.tagType = 'global'
+  tagForm.projectId = null
 }
 
 const closeDialogs = () => {
@@ -704,7 +700,7 @@ const saveTag = async () => {
       name: tagForm.name,
       category: tagForm.category,
       color: tagForm.color,
-      project_id: tagForm.tag_type === 'global' ? null : tagForm.project_id
+      projectId: tagForm.tagType === 'global' ? null : tagForm.projectId
     }
     
     let response
@@ -733,26 +729,26 @@ const saveTag = async () => {
 
 const handleSelectAllGlobalTags = (checked: boolean) => {
   if (checked) {
-    copyForm.tag_ids = globalTags.value.map(tag => tag.id)
+    copyForm.tagIds = globalTags.value.map(tag => tag.id)
   } else {
-    copyForm.tag_ids = []
+    copyForm.tagIds = []
   }
 }
 
 const copyTagsToProject = async () => {
-  if (!copyForm.project_id || !copyForm.tag_ids.length) {
+  if (!copyForm.projectId || !copyForm.tagIds.length) {
     ElMessage.warning('请选择项目和标签')
     return
   }
   
   copying.value = true
   try {
-    const response = await tagApi.copyGlobalTagsToProject(copyForm.project_id, copyForm.tag_ids)
+    const response = await tagApi.copyGlobalTagsToProject(copyForm.projectId, copyForm.tagIds)
     if (response?.code === 200) {
-      ElMessage.success(`成功复制 ${copyForm.tag_ids.length} 个标签到项目`)
+      ElMessage.success(`成功复制 ${copyForm.tagIds.length} 个标签到项目`)
       showCopyDialog.value = false
-      copyForm.project_id = null
-      copyForm.tag_ids = []
+      copyForm.projectId = null
+      copyForm.tagIds = []
       await loadTags()
     } else {
       ElMessage.error(response?.message || '复制失败')

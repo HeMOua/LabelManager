@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Query, Path
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 import os
@@ -20,7 +20,7 @@ router = APIRouter()
 async def upload_image(
         project_id: int,
         file: UploadFile = File(...),
-        tag_ids: str = Form("[]"),  # JSON字符串形式的标签ID列表
+        tag_ids: str = Form("[]", alias="tagIds"),  # JSON字符串形式的标签ID列表
         db: Session = Depends(get_db)
 ):
     """上传图片"""
@@ -105,7 +105,7 @@ def get_image(image_id: int, db: Session = Depends(get_db)):
 @router.put("/{image_id}/tags", response_model=ApiResponse[None])
 def update_image_tags(
         image_id: int,
-        tag_ids: List[int],
+        tag_ids: List[int] = Form(alias="tagIds"),
         db: Session = Depends(get_db)
 ):
     """更新图片标签"""

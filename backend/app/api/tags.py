@@ -21,8 +21,8 @@ router = APIRouter()
 def get_tags(
         skip: int = 0,
         limit: int = 100,
-        tag_type: Optional[str] = Query(None, description="标签类型: global, project, all"),
-        project_id: Optional[int] = Query(None, description="项目ID，仅当tag_type为project时有效"),
+        tag_type: Optional[str] = Query(None, alias="tagType", description="标签类型: global, project, all"),
+        project_id: Optional[int] = Query(None, alias="projectId", description="项目ID，仅当tag_type为project时有效"),
         category: Optional[str] = Query(None, description="标签分类筛选"),
         db: Session = Depends(get_db)
 ):

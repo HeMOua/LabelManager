@@ -15,10 +15,8 @@ class TagCreate(TagBase):
     project_id: Optional[int] = Field(None, description="项目ID，为空表示创建全局标签")
 
 
-class TagUpdate(BaseModel):
-    name: Optional[str] = None
-    category: Optional[str] = None
-    color: Optional[str] = None
+class TagUpdate(TagBase):
+    pass
 
 
 class Tag(TagBase):
