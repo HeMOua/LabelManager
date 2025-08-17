@@ -60,4 +60,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     TreeNode: typeof import('./src/components/TreeNode.vue')['default']
   }
+  export interface GlobalDirectives {
+    vLoading: typeof import('element-plus/es')['ElLoadingDirective']
+  }
 }

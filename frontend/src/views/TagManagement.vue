@@ -1,16 +1,22 @@
 <template>
   <div class="tag-management">
-    <div class="tag-management-header">
-      <el-page-header @back="$router.go(-1)" content="标签管理">
-        <template #extra>
-          <div class="tag-controls">
-            <el-button type="primary" :icon="Plus" @click="showCreateDialog = true">
-              创建标签
-            </el-button>
-          </div>
-        </template>
-      </el-page-header>
+    <!-- 页面级Loading -->
+    <div v-if="pageLoading" class="page-loading-container">
+      <el-skeleton :rows="10" animated />
     </div>
+
+    <div v-else>
+      <div class="tag-management-header">
+        <el-page-header @back="$router.go(-1)" content="标签管理">
+          <template #extra>
+            <div class="tag-controls">
+              <el-button type="primary" :icon="Plus" @click="showCreateDialog = true">
+                创建标签
+              </el-button>
+            </div>
+          </template>
+        </el-page-header>
+      </div>
 
     <el-card class="filter-card" shadow="never">
       <el-row :gutter="16">
@@ -28,7 +34,8 @@
             @change="loadTags" 
             placeholder="选择项目" 
             clearable
-            :disabled="selectedTagType === 'global'"
+            :disabled="selectedTagType !== 'project'"
+            :loading="projectsLoading"
           >
             <el-option label="所有项目" value="" />
             <el-option
@@ -133,7 +140,14 @@
         </div>
       </template>
 
-      <div v-if="viewMode === 'grid'" class="tag-grid">
+      <!-- Loading skeleton for grid view -->
+      <div v-if="tagsLoading && viewMode === 'grid'" class="tag-grid">
+        <el-card v-for="i in 3" :key="i" class="tag-card" shadow="hover">
+          <el-skeleton :rows="3" animated />
+        </el-card>
+      </div>
+
+      <div v-else-if="viewMode === 'grid'" class="tag-grid">
         <el-card 
           v-for="tag in sortedTags" 
           :key="tag.id" 
@@ -161,7 +175,7 @@
             <div class="tag-stats">
               <el-statistic 
                 title="使用次数" 
-                :value="tag.image_count" 
+                :value="tag.imageCount" 
                 :value-style="{ fontSize: '14px' }" 
               />
               <span class="created-date">{{ formatDate(tag.createdAt) }}</span>
@@ -172,6 +186,53 @@
             <el-button size="small" type="danger" @click.stop="deleteTag(tag)" :icon="Delete" circle />
           </div>
         </el-card>
+      </div>
+
+      <!-- Loading skeleton for table view -->
+      <div v-else-if="tagsLoading">
+        <el-table :data="[]" row-key="id">
+          <el-table-column label="颜色" width="60">
+            <template #default>
+              <el-skeleton-item variant="circle" style="width: 20px; height: 20px;" />
+            </template>
+          </el-table-column>
+          <el-table-column label="名称">
+            <template #default>
+              <el-skeleton-item variant="text" style="width: 100px;" />
+            </template>
+          </el-table-column>
+          <el-table-column label="类型" width="80">
+            <template #default>
+              <el-skeleton-item variant="text" style="width: 60px;" />
+            </template>
+          </el-table-column>
+          <el-table-column label="分类">
+            <template #default>
+              <el-skeleton-item variant="text" style="width: 80px;" />
+            </template>
+          </el-table-column>
+          <el-table-column label="所属项目" width="120">
+            <template #default>
+              <el-skeleton-item variant="text" style="width: 100px;" />
+            </template>
+          </el-table-column>
+          <el-table-column label="使用次数" width="100">
+            <template #default>
+              <el-skeleton-item variant="text" style="width: 50px;" />
+            </template>
+          </el-table-column>
+          <el-table-column label="创建时间" width="150">
+            <template #default>
+              <el-skeleton-item variant="text" style="width: 120px;" />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120">
+            <template #default>
+              <el-skeleton-item variant="button" style="width: 32px; height: 32px;" />
+              <el-skeleton-item variant="button" style="width: 32px; height: 32px; margin-left: 8px;" />
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
 
       <div v-else>
@@ -255,8 +316,8 @@
           <el-image
             v-for="image in tagImages"
             :key="image.id"
-            :src="image.thumbnail"
-            :alt="image.name"
+            :src="image.thumbnailPath || image.url"
+            :alt="image.filename || '图片'"
             fit="cover"
             class="related-image"
             lazy
@@ -272,7 +333,7 @@
       width="500px"
     >
       <el-form ref="tagFormRef" :model="tagForm" :rules="tagFormRules" label-width="80px">
-        <el-form-item label="标签类型" prop="tag_type">
+        <el-form-item label="标签类型" prop="tagType">
           <el-radio-group v-model="tagForm.tagType" :disabled="showEditDialog">
             <el-radio label="global">全局标签</el-radio>
             <el-radio label="project">项目标签</el-radio>
@@ -285,7 +346,7 @@
         
         <el-form-item 
           label="所属项目" 
-          prop="project_id"
+          prop="projectId"
           v-if="tagForm.tagType === 'project'"
         >
           <el-select v-model="tagForm.projectId" placeholder="选择项目" style="width: 100%">
@@ -351,7 +412,7 @@
       <div class="copy-dialog-content">
         <el-form :model="copyForm" label-width="100px">
           <el-form-item label="目标项目" required>
-            <el-select v-model="copyForm.project_id" placeholder="选择目标项目" style="width: 100%">
+            <el-select v-model="copyForm.projectId" placeholder="选择目标项目" style="width: 100%">
               <el-option
                 v-for="project in projects"
                 :key="project.id"
@@ -364,16 +425,16 @@
           <el-form-item label="选择标签">
             <div class="tag-selection">
               <div class="selection-header">
-                <el-checkbox 
-                  v-model="selectAllGlobalTags"
-                  :indeterminate="isGlobalTagsIndeterminate"
-                  @change="handleSelectAllGlobalTags"
-                >
-                  全选 ({{ copyForm.tag_ids.length }}/{{ globalTags.length }})
-                </el-checkbox>
+                        <el-checkbox 
+          v-model="selectAllGlobalTags" 
+          :indeterminate="isGlobalTagsIndeterminate"
+          @change="handleSelectAllGlobalTags"
+        >
+          全选 ({{ copyForm.tagIds.length }}/{{ globalTags.length }})
+        </el-checkbox>
               </div>
               <div class="tag-list">
-                <el-checkbox-group v-model="copyForm.tag_ids">
+                <el-checkbox-group v-model="copyForm.tagIds">
                   <div 
                     v-for="tag in globalTags" 
                     :key="tag.id"
@@ -403,12 +464,13 @@
           type="primary" 
           @click="copyTagsToProject"
           :loading="copying"
-          :disabled="!copyForm.project_id || !copyForm.tag_ids.length"
+          :disabled="!copyForm.projectId || !copyForm.tagIds.length"
         >
-          复制标签 ({{ copyForm.tag_ids.length }})
+          复制标签 ({{ copyForm.tagIds.length }})
         </el-button>
       </template>
     </el-dialog>
+      </div>
   </div>
 </template>
 
@@ -421,6 +483,7 @@ import {
 } from '@element-plus/icons-vue'
 import { tagApi } from '@/api/tags'
 import { projectApi } from '@/api/project'
+import type { ApiResponse, Image } from '@/types'
 
 interface Tag {
   id: number
@@ -456,10 +519,15 @@ const showTagDetails = ref(false)
 const showCopyDialog = ref(false)
 const projects = ref<Project[]>([])
 const categories = ref<string[]>([])
-const tagImages = ref([])
+const tagImages = ref<Image[]>([])
 const tagFormRef = ref()
 const saving = ref(false)
 const copying = ref(false)
+
+// Loading states
+const pageLoading = ref(false)
+const tagsLoading = ref(false)
+const projectsLoading = ref(false)
 
 const tagForm = reactive({
   id: null as number | null,
@@ -499,7 +567,16 @@ const tagFormRules = {
   ]
 }
 
-const showDialog = computed(() => showCreateDialog.value || showEditDialog.value)
+const showDialog = computed({
+  get: () => showCreateDialog.value || showEditDialog.value,
+  set: (val: boolean) => {
+    if (!val) {
+      showCreateDialog.value = false
+      showEditDialog.value = false
+      resetTagForm()
+    }
+  }
+})
 
 const presetColors = [
   '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57',
@@ -561,18 +638,22 @@ const isGlobalTagsIndeterminate = computed(() => {
 
 const loadProjects = async () => {
   try {
-    const response = await projectApi.getProjects()
+    projectsLoading.value = true
+    const response = await projectApi.getProjects() as unknown as ApiResponse<Project[]>
     if (response?.data) {
       projects.value = response.data
     }
   } catch (error) {
     ElMessage.error('加载项目列表失败')
     console.error('Load projects error:', error)
+  } finally {
+    projectsLoading.value = false
   }
 }
 
 const loadTags = async () => {
   try {
+    tagsLoading.value = true
     const params: any = {}
     
     if (selectedTagType.value !== 'all') {
@@ -583,7 +664,7 @@ const loadTags = async () => {
       params.projectId = selectedProject.value
     }
     
-    const response = await tagApi.getTags(params)
+    const response = await tagApi.getTags(params) as unknown as ApiResponse<Tag[]>
     if (response?.data) {
       tags.value = response.data
       filterTags()
@@ -592,6 +673,8 @@ const loadTags = async () => {
   } catch (error) {
     ElMessage.error('加载标签列表失败')
     console.error('Load tags error:', error)
+  } finally {
+    tagsLoading.value = false
   }
 }
 
@@ -660,7 +743,7 @@ const deleteTag = async (tag: Tag) => {
       }
     )
     
-    const response = await tagApi.deleteTag(tag.id)
+    const response = await tagApi.deleteTag(tag.id) as unknown as ApiResponse<any>
     if (response?.code === 200) {
       ElMessage.success('标签删除成功')
       await loadTags()
@@ -705,9 +788,9 @@ const saveTag = async () => {
     
     let response
     if (showEditDialog.value && tagForm.id) {
-      response = await tagApi.updateTag(tagForm.id, tagData)
+      response = await tagApi.updateTag(tagForm.id, tagData) as unknown as ApiResponse<any>
     } else {
-      response = await tagApi.createTag(tagData)
+      response = await tagApi.createTag(tagData) as unknown as ApiResponse<any>
     }
     
     if (response?.code === 200) {
@@ -743,7 +826,7 @@ const copyTagsToProject = async () => {
   
   copying.value = true
   try {
-    const response = await tagApi.copyGlobalTagsToProject(copyForm.projectId, copyForm.tagIds)
+    const response = await tagApi.copyGlobalTagsToProject(copyForm.projectId, copyForm.tagIds) as unknown as ApiResponse<any>
     if (response?.code === 200) {
       ElMessage.success(`成功复制 ${copyForm.tagIds.length} 个标签到项目`)
       showCopyDialog.value = false
@@ -773,9 +856,13 @@ watch(() => selectedTagType.value, () => {
   loadTags()
 })
 
-onMounted(() => {
-  loadProjects()
-  loadTags()
+onMounted(async () => {
+  try {
+    pageLoading.value = true
+    await Promise.all([loadProjects(), loadTags()])
+  } finally {
+    pageLoading.value = false
+  }
 })
 </script>
 
@@ -784,6 +871,11 @@ onMounted(() => {
   padding: 24px;
   max-width: 1400px;
   margin: 0 auto;
+}
+
+.page-loading-container {
+  margin: 40px 0;
+  padding: 20px;
 }
 
 .tag-management-header {

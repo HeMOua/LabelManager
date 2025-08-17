@@ -47,7 +47,12 @@
       </div>
     </div>
 
-    <div class="project-list">
+    <!-- 页面级Loading -->
+    <div v-if="pageLoading" class="page-loading-container">
+      <el-skeleton :rows="10" animated />
+    </div>
+
+    <div v-else class="project-list">
       <div class="list-header">
         <div class="sort-controls">
           <label>排序:</label>
@@ -80,7 +85,17 @@
         </div>
       </div>
 
-      <div v-if="viewMode === 'grid'" class="project-grid">
+      <!-- Loading skeleton for grid view -->
+      <div v-if="projectsLoading && viewMode === 'grid'" class="project-grid">
+        <div v-for="i in 6" :key="i" class="project-card">
+          <div class="project-status active">进行中</div>
+          <div class="project-info">
+            <el-skeleton :rows="4" animated />
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="viewMode === 'grid'" class="project-grid">
         <div 
           v-for="project in sortedProjects" 
           :key="project.id" 
@@ -103,17 +118,17 @@
               </div>
               <div class="stat-item">
                 <span class="stat-label">标签数:</span>
-                <span class="stat-value">{{ project.tagCount }}</span>
+                <span class="stat-value">{{ project.tagCount || 0 }}</span>
               </div>
               <div class="stat-item">
                 <span class="stat-label">标注率:</span>
-                <span class="stat-value">{{ project.labelProgress }}%</span>
+                <span class="stat-value">{{ project.labelProgress || 0 }}%</span>
               </div>
             </div>
             
             <div class="project-dates">
-              <small>创建: {{ formatDate(project.createdAt) }}</small>
-              <small>更新: {{ formatDate(project.updatedAt) }}</small>
+              <small>创建: {{ formatDate(project.createdAt || '') }}</small>
+              <small>更新: {{ formatDate(project.updatedAt || '') }}</small>
             </div>
           </div>
           
@@ -123,6 +138,52 @@
             <button @click.stop="deleteProject(project)" class="delete-btn">删除</button>
           </div>
         </div>
+      </div>
+
+      <!-- Loading skeleton for table view -->
+      <div v-else-if="projectsLoading" class="project-table">
+        <table>
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>状态</th>
+              <th>图片数</th>
+              <th>标签数</th>
+              <th>标注进度</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="i in 5" :key="i">
+              <td>
+                <el-skeleton-item variant="text" style="width: 120px;" />
+              </td>
+              <td>
+                <el-skeleton-item variant="text" style="width: 60px;" />
+              </td>
+              <td>
+                <el-skeleton-item variant="text" style="width: 40px;" />
+              </td>
+              <td>
+                <el-skeleton-item variant="text" style="width: 40px;" />
+              </td>
+              <td>
+                <el-skeleton-item variant="text" style="width: 80px;" />
+              </td>
+              <td>
+                <el-skeleton-item variant="text" style="width: 100px;" />
+              </td>
+              <td>
+                <div class="table-actions">
+                  <el-skeleton-item variant="button" style="width: 32px; height: 24px;" />
+                  <el-skeleton-item variant="button" style="width: 32px; height: 24px; margin-left: 4px;" />
+                  <el-skeleton-item variant="button" style="width: 32px; height: 24px; margin-left: 4px;" />
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div v-else class="project-table">
@@ -157,19 +218,19 @@
                 </span>
               </td>
               <td>{{ project.imageCount }}</td>
-              <td>{{ project.tagCount }}</td>
+              <td>{{ project.tagCount || 0 }}</td>
               <td>
                 <div class="progress-cell">
                   <div class="progress-bar">
                     <div 
                       class="progress-fill" 
-                      :style="{ width: project.labelProgress + '%' }"
+                      :style="{ width: (project.labelProgress || 0) + '%' }"
                     ></div>
                   </div>
-                  <span>{{ project.labelProgress }}%</span>
+                  <span>{{ project.labelProgress || 0 }}%</span>
                 </div>
               </td>
-              <td>{{ formatDate(project.createdAt) }}</td>
+              <td>{{ formatDate(project.createdAt || '') }}</td>
               <td>
                 <div class="table-actions">
                   <button @click.stop="editProject(project)" class="edit-btn">编辑</button>
@@ -192,7 +253,7 @@
           <div class="detail-item">
             <label>状态:</label>
             <span class="status-badge" :class="selectedProject?.status">
-              {{ getStatusText(selectedProject?.status) }}
+              {{ getStatusText(selectedProject?.status || 'active') }}
             </span>
           </div>
           <div class="detail-item">
@@ -201,11 +262,11 @@
           </div>
           <div class="detail-item">
             <label>创建时间:</label>
-            <span>{{ formatDate(selectedProject?.createdAt) }}</span>
+            <span>{{ formatDate(selectedProject?.createdAt || '') }}</span>
           </div>
           <div class="detail-item">
             <label>最后更新:</label>
-            <span>{{ formatDate(selectedProject?.updatedAt) }}</span>
+            <span>{{ formatDate(selectedProject?.updatedAt || '') }}</span>
           </div>
         </div>
 
@@ -213,19 +274,19 @@
           <h3>数据统计</h3>
           <div class="stats-grid">
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject?.imageCount }}</div>
+              <div class="stats-number">{{ selectedProject?.imageCount || 0 }}</div>
               <div class="stats-label">总图片</div>
             </div>
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject?.tagCount }}</div>
+              <div class="stats-number">{{ selectedProject?.tagCount || 0 }}</div>
               <div class="stats-label">标签数</div>
             </div>
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject?.labeledImages }}</div>
+              <div class="stats-number">{{ selectedProject?.labeledImages || 0 }}</div>
               <div class="stats-label">已标注</div>
             </div>
             <div class="stats-item">
-              <div class="stats-number">{{ selectedProject?.labelProgress }}%</div>
+              <div class="stats-number">{{ selectedProject?.labelProgress || 0 }}%</div>
               <div class="stats-label">完成度</div>
             </div>
           </div>
@@ -263,16 +324,16 @@
         <div class="detail-section">
           <h3>快速操作</h3>
           <div class="quick-actions">
-            <button @click="goToGallery(selectedProject)" class="action-btn gallery-btn">
+            <button @click="goToGallery(selectedProject)" class="action-btn gallery-btn" :disabled="!selectedProject">
               查看图片库
             </button>
-            <button @click="goToTags(selectedProject)" class="action-btn tags-btn">
+            <button @click="goToTags(selectedProject)" class="action-btn tags-btn" :disabled="!selectedProject">
               管理标签
             </button>
-            <button @click="exportProject(selectedProject)" class="action-btn export-btn">
+            <button @click="exportProject(selectedProject)" class="action-btn export-btn" :disabled="!selectedProject">
               导出数据
             </button>
-            <button @click="generateReport(selectedProject)" class="action-btn report-btn">
+            <button @click="generateReport(selectedProject)" class="action-btn report-btn" :disabled="!selectedProject">
               生成报告
             </button>
           </div>
@@ -307,7 +368,7 @@
           
           <el-form-item class="dialog-actions">
             <el-button @click="closeDialogs" class="cancel-btn">取消</el-button>
-            <el-button @click="saveProject" class="save-btn">保存</el-button>
+            <el-button @click="saveProject" class="save-btn" :loading="saving">保存</el-button>
           </el-form-item>
           
         </el-form>
@@ -317,7 +378,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Project, Tag } from '@/types/index'
+import type { Project } from '@/types/index'
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { projectApi } from '@/api/project'
@@ -337,14 +398,19 @@ const sortOrder = ref<'asc' | 'desc'>('desc')
 const viewMode = ref<'grid' | 'list'>('grid')
 const showCreateDialog = ref(false)
 const showEditDialog = ref(false)
-const projectTags = ref([])
-const recentImages = ref([])
+const projectTags = ref<Array<{id: number, name: string, color: string, count: number}>>([])
+const recentImages = ref<Array<{id: number, name: string, thumbnail: string}>>([])
+
+// Loading states
+const pageLoading = ref(false)
+const projectsLoading = ref(false)
+const saving = ref(false)
 
 const projectForm = reactive({
   id: 0,
   name: '',
   description: '',
-  status: 'active',
+  status: 'active' as 'active' | 'completed' | 'paused',
 })
 
 const drawerVisible = ref(false)
@@ -373,23 +439,26 @@ const completedProjectsCount = computed(() => {
 })
 
 const totalImagesCount = computed(() => {
-  return filteredProjects.value.reduce((total, p) => total + p.imageCount, 0)
+  return filteredProjects.value.reduce((total, p) => total + (p.imageCount || 0), 0)
 })
 
 const sortedProjects = computed(() => {
   const sorted = [...filteredProjects.value].sort((a, b) => {
-    let aVal: any = a[sortBy.value]
-    let bVal: any = b[sortBy.value]
+    let aVal: string | number | undefined = a[sortBy.value]
+    let bVal: string | number | undefined = b[sortBy.value]
 
-    if (typeof aVal === 'string') {
+    if (sortBy.value === 'name' && typeof aVal === 'string' && typeof bVal === 'string') {
       aVal = aVal.toLowerCase()
       bVal = bVal.toLowerCase()
-    } else if (typeof aVal === 'number') {
+    } else if (sortBy.value === 'imageCount' && typeof aVal === 'number' && typeof bVal === 'number') {
       aVal = Number(aVal)
       bVal = Number(bVal)
-    } else if (aVal instanceof Date) {
+    } else if ((sortBy.value === 'createdAt' || sortBy.value === 'updatedAt') && aVal && bVal) {
       aVal = new Date(aVal).getTime()
       bVal = new Date(bVal).getTime()
+    } else {
+      aVal = 0
+      bVal = 0
     }
     
     if (sortOrder.value === 'asc') {
@@ -403,11 +472,14 @@ const sortedProjects = computed(() => {
 
 const loadProjects = async () => {
   try {
+    projectsLoading.value = true
     const response = await projectApi.getProjects()
-    projects.value = response.data
+    projects.value = response.data || []
     filterProjects()
   } catch (error) {
     console.error('加载项目失败:', error)
+  } finally {
+    projectsLoading.value = false
   }
 }
 
@@ -436,10 +508,10 @@ const toggleSortOrder = () => {
 const selectProject = (project: Project) => {
   drawerVisible.value = true
   selectedProject.value = project
-  loadProjectDetails(project.id)
+  loadProjectDetails()
 }
 
-const loadProjectDetails = async (projectId: number) => {
+const loadProjectDetails = async () => {
   // 模拟项目详情数据
   projectTags.value = [
     { id: 1, name: '正常', color: '#96ceb4', count: 450 },
@@ -467,9 +539,8 @@ const getStatusText = (status: Project['status']) => {
 const editProject = (project: Project) => {
   projectForm.id = project.id
   projectForm.name = project.name
-  projectForm.description = project.description
+  projectForm.description = project.description || ''
   projectForm.status = project.status
-  projectForm.presetTags = []
   showEditDialog.value = true
 }
 
@@ -487,17 +558,16 @@ const duplicateProject = async (project: Project) => {
 const deleteProject = async (project: Project) => {
   try {
     await showConfirm(`确定要删除项目 \"${project.name}\" 吗？此操作不可恢复！`, '警告')
-    projectApi.deleteProject(project.id)
+    await projectApi.deleteProject(project.id)
     await loadProjects()
   } catch {}
 }
 
 const resetProjectForm = () => {
-  projectForm.id = null
+  projectForm.id = 0
   projectForm.name = ''
   projectForm.description = ''
   projectForm.status = 'active'
-  projectForm.presetTags = []
 }
 
 const closeDialogs = () => {
@@ -508,6 +578,7 @@ const closeDialogs = () => {
 
 const saveProject = async () => {
   try {
+    saving.value = true
     if (showEditDialog.value) {
       await projectApi.updateProject(projectForm.id, projectForm)
     } else {
@@ -518,35 +589,47 @@ const saveProject = async () => {
     closeDialogs()
   } catch (error) {
     console.error('保存失败:', error)
+  } finally {
+    saving.value = false
   }
 }
 
-const goToGallery = (project: Project) => {
+const goToGallery = (project: Project | null) => {
+  if (!project) return
   addTabFromMenu('/gallery')
   router.push({ path: '/gallery', query: { project: project.id } })
 }
 
-const goToTags = (project: Project) => {
+const goToTags = (project: Project | null) => {
+  if (!project) return
   addTabFromMenu('/tags')
   router.push({ path: '/tags', query: { project: project.id } })
 }
 
-const exportProject = (project: Project) => {
+const exportProject = (project: Project | null) => {
+  if (!project) return
   console.log('导出项目数据:', project)
   // 实现导出功能
 }
 
-const generateReport = (project: Project) => {
+const generateReport = (project: Project | null) => {
+  if (!project) return
   console.log('生成项目报告:', project)
   // 实现报告生成功能
 }
 
 const formatDate = (date: string) => {
+  if (!date) return '-'
   return new Date(date).toLocaleDateString('zh-CN')
 }
 
-onMounted(() => {
-  loadProjects()
+onMounted(async () => {
+  try {
+    pageLoading.value = true
+    await loadProjects()
+  } finally {
+    pageLoading.value = false
+  }
 })
 </script>
 
@@ -556,6 +639,11 @@ onMounted(() => {
   max-width: 1400px;
   margin: 0 auto;
   position: relative;
+}
+
+.page-loading-container {
+  margin: 40px 0;
+  padding: 20px;
 }
 
 .project-header {

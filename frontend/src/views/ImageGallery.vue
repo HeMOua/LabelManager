@@ -34,6 +34,7 @@
               clearable
               @change="onProjectChange"
               :disabled="batchMode"
+              :loading="projectsLoading"
             >
               <el-option
                 v-for="project in projects"
@@ -161,6 +162,13 @@
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-container">
       <el-skeleton :rows="8" animated />
+    </div>
+
+    <!-- 项目选择提示 -->
+    <div v-else-if="!selectedProject && !loading" class="no-project-selected">
+      <el-empty description="请先选择一个项目">
+        <el-button type="primary" @click="loadProjects">选择项目</el-button>
+      </el-empty>
     </div>
 
     <!-- 网格视图 -->
@@ -409,6 +417,8 @@
       width="80%"
       :before-close="closeImagePreview"
       class="image-preview-dialog"
+      v-loading="imagePreviewLoading"
+      element-loading-text="加载图片中..."
     >
       <div class="preview-container" v-if="previewImageData">
         <el-image
@@ -433,6 +443,8 @@
       title="编辑图片标签"
       width="600px"
       :before-close="closeTagDialog"
+      v-loading="tagsLoading"
+      element-loading-text="加载标签中..."
     >
       <div class="tag-dialog-content" v-if="selectedImage">
         <div class="image-preview-small">
@@ -532,6 +544,8 @@
       v-model="showBatchTagDialog"
       title="批量添加标签"
       width="500px"
+      v-loading="savingBatchTags"
+      element-loading-text="正在添加标签..."
     >
       <div class="batch-tag-content">
         <p>为 {{ selectedImages.length }} 张图片添加标签：</p>
@@ -655,6 +669,9 @@ const showImagePreview = ref(false)
 const loading = ref(false)
 const uploading = ref(false)
 const savingTags = ref(false)
+const projectsLoading = ref(false)
+const tagsLoading = ref(false)
+const imagePreviewLoading = ref(false)
 
 // 分页
 const currentPage = ref(1)
@@ -1131,6 +1148,7 @@ const retryLoadImage = (image: Image) => {
 
 // API调用函数
 const loadProjects = async () => {
+  projectsLoading.value = true
   try {
     const response = await projectApi.getProjects()
     if (response?.data) {
@@ -1145,6 +1163,8 @@ const loadProjects = async () => {
   } catch (error) {
     ElMessage.error('加载项目列表失败')
     console.error('Load projects error:', error)
+  } finally {
+    projectsLoading.value = false
   }
 }
 
@@ -1415,10 +1435,9 @@ watch(selectedFiles, (newVal) => {
 })
 
 // 组件挂载
-onMounted(() => {
+onMounted(async () => {
   loadViewMode()
-  loadProjects()
-  loadTags()
+  await Promise.all([loadProjects(), loadTags()])
 })
 
 // 组件卸载时清理
@@ -1693,6 +1712,11 @@ onUnmounted(() => {
 /* 加载状态 */
 .loading-container {
   margin: 40px 0;
+}
+
+.no-project-selected {
+  margin: 40px 0;
+  text-align: center;
 }
 
 /* 网格视图样式 */
